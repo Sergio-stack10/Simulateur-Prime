@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur Prime de Régularité</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .section-title {
+            background-color: #34495e;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 1.1em;
+        }
+        .form-group {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .form-group label {
+            width: 200px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .btn-calculate {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .btn-calculate:hover {
+            background-color: #2980b9;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .results-table th, .results-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        .results-table th {
+            background-color: #ecf0f1;
+            width: 40%;
+        }
+        .results-table td {
+            background-color: #e8f8f5;
+            text-align: center;
+        }
+        .highlight {
+            color: #d35400;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        #error-message {
+            color: red;
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>SIMULATEUR PRIME DE RÉGULARITÉ — ESPACE COLLABORATEUR</h1>
+    
+    <div class="section-title">① MA SITUATION RÉELLE — rechercher par matricule (Employee ID)</div>
+    
+    <div class="form-group">
+        <label for="matricule">Mon matricule (Employee ID) :</label>
+        <input type="text" id="matricule" placeholder="Ex: 102544211">
+    </div>
+
+    <div class="form-group">
+        <label for="date_embauche">Date d'embauche :</label>
+        <input type="date" id="date_embauche">
+    </div>
+
+    <div class="form-group">
+        <label for="profil_m1">Profil M1 (mois -1) :</label>
+        <select id="profil_m1">
+            <option value="0-2">0-2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="profil_m2">Profil M2 (mois -2) :</label>
+        <select id="profil_m2">
+            <option value="0-2">0-2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="profil_m3">Profil M3 (mois -3) :</label>
+        <select id="profil_m3">
+            <option value="0-2">0-2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+        </select>
+    </div>
+
+    <button class="btn-calculate" onclick="simuler()">Lancer la Simulation</button>
+    <div id="error-message"></div>
+
+    <!-- Tableau des résultats -->
+    <table class="results-table" id="results-table" style="display: none;">
+        <tr>
+            <th>Nom</th>
+            <td id="res-nom">-</td>
+        </tr>
+        <tr>
+            <th>Statut WKD</th>
+            <td id="res-statut">-</td>
+        </tr>
+        <tr>
+            <th>Site</th>
+            <td id="res-site">-</td>
+        </tr>
+        <tr>
+            <th>Ancienneté (mois)</th>
+            <td id="res-anciennete">-</td>
+        </tr>
+        <tr>
+            <th>Profil M1 (mois -1)</th>
+            <td id="res-m1">-</td>
+        </tr>
+        <tr>
+            <th>Profil M2 (mois -2)</th>
+            <td id="res-m2">-</td>
+        </tr>
+        <tr>
+            <th>Profil M3 (mois -3)</th>
+            <td id="res-m3">-</td>
+        </tr>
+        <tr>
+            <th>Cumul de points</th>
+            <td id="res-points">-</td>
+        </tr>
+        <tr>
+            <th>Éligibilité</th>
+            <td id="res-eligibilite">-</td>
+        </tr>
+        <tr>
+            <th>PRIME ESTIMÉE (Ar)</th>
+            <td id="res-prime" class="highlight">-</td>
+        </tr>
+    </table>
+</div>
+
+<script>
+    async function simuler() {
+        const matricule = document.getElementById('matricule').value;
+        const dateEmbauche = document.getElementById('date_embauche').value;
+        const m1 = document.getElementById('profil_m1').value;
+        const m2 = document.getElementById('profil_m2').value;
+        const m3 = document.getElementById('profil_m3').value;
+
+        const errorDiv = document.getElementById('error-message');
+        const resultsTable = document.getElementById('results-table');
+        
+        errorDiv.innerText = "";
+        resultsTable.style.display = "none";
+
+        if (!matricule || !dateEmbauche) {
+            errorDiv.innerText = "Veuillez remplir le matricule et la date d'embauche.";
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/simulate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    matricule: matricule,
+                    date_embauche: dateEmbauche,
+                    profil_m1: m1,
+                    profil_m2: m2,
+                    profil_m3: m3
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Erreur lors de la simulation');
+            }
+
+            // Remplissage du tableau
+            document.getElementById('res-nom').innerText = data.nom;
+            document.getElementById('res-statut').innerText = data.statut;
+            document.getElementById('res-site').innerText = data.site;
+            document.getElementById('res-anciennete').innerText = data.anciennete_mois;
+            document.getElementById('res-m1').innerText = data.profil_m1;
+            document.getElementById('res-m2').innerText = data.profil_m2;
+            document.getElementById('res-m3').innerText = data.profil_m3;
+            document.getElementById('res-points').innerText = data.cumul_points;
+            document.getElementById('res-eligibilite').innerText = data.cumul_points > 0 ? "Éligible" : "Non Éligible";
+            document.getElementById('res-prime').innerText = data.prime_estimee;
+
+            resultsTable.style.display = "table";
+
+        } catch (error) {
+            errorDiv.innerText = error.message;
+        }
+    }
+</script>
+
+</body>
+</html>
