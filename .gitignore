@@ -1,0 +1,22 @@
+# Fichiers Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Fichiers Excel avec données sensibles
+*.xlsx
+*.xls
+*.csv
+
+# Fichiers de configuration IDE
+.vscode/
+.idea/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
