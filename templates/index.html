@@ -22,11 +22,14 @@
 </nav>
 
 <main class="app-main">
+
   <section class="hero reveal" style="--d:0s">
     <h1>Ma situation réelle</h1>
-    <p>Recherchez votre matricule, renseignez vos profils et découvrez votre prime estimée.</p>
+    <p>Recherchez votre matricule, renseignez vos activités et profils,
+       puis découvrez votre prime estimée.</p>
   </section>
 
+  <!-- ===== 1. Identification ===== -->
   <section class="card reveal" style="--d:.08s">
     <h2><span class="chip">1</span> Identifier le collaborateur</h2>
     <div class="search-bar">
@@ -37,46 +40,63 @@
     <div id="employee-result"></div>
   </section>
 
-  <section class="card reveal" style="--d:.16s">
-    <h2><span class="chip">2</span> Paramètres de la simulation</h2>
+  <!-- ===== 2. Paramètres ===== -->
+  <section class="card reveal" style="--d:.14s">
+    <h2><span class="chip">2</span> Paramètres</h2>
     <div class="grid-3">
       <div class="field"><label for="hire-date">Date d'embauche *</label>
         <input id="hire-date" type="date"/></div>
-      <div class="field"><label for="reference-date">Date de référence</label>
-        <input id="reference-date" type="date"/></div>
+      <div class="field">
+        <label for="reference-date">Date de référence (fin du mois de performance)</label>
+        <input id="reference-date" type="date"/>
+        <button id="btn-eom" class="linklike" type="button">🗓 Fin du mois courant</button>
+      </div>
       <div class="field"><label for="site">Site (payplan) *</label>
         <select id="site">
           <option value="ANTA">ANTA — Antananarivo</option>
           <option value="TMM">TMM — Tamatave</option>
           <option value="AUTRE">AUTRE</option>
-        </select></div>
-    </div>
-    <div class="field">
-      <label>Profils des 3 derniers mois <span class="muted">(M1 = plus ancien → M3 = plus récent)</span> *</label>
-      <div class="profile-row">
-        <select class="profile" data-month="M1"></select>
-        <select class="profile" data-month="M2"></select>
-        <select class="profile" data-month="M3"></select>
+        </select>
+        <span class="muted small">Renseigné automatiquement après recherche du matricule.</span>
       </div>
+    </div>
+  </section>
+
+  <!-- ===== 3. Activités ===== -->
+  <section class="card reveal" style="--d:.2s">
+    <h2><span class="chip">3</span> Activités du mois
+        <span class="muted small" id="act-count" style="margin-left:auto"></span></h2>
+    <p class="muted small">Une activité = un projet (code MSA) + ses 3 profils + vos heures.
+       La prime est calculée par activité, puis proratisée selon les heures passées sur chacune.</p>
+    <div id="activites"></div>
+    <div class="act-toolbar">
+      <button id="btn-add-act" class="btn btn-ghost">＋ Ajouter une activité</button>
+      <span class="muted small" id="act-total-h"></span>
     </div>
     <button id="btn-calculate" class="btn btn-primary btn-block btn-lg">✨ Calculer ma prime</button>
   </section>
 
+  <!-- ===== 4. Résultat ===== -->
   <section class="card" id="result-card" hidden></section>
 
+  <!-- ===== Mes simulations ===== -->
   <section class="card reveal" style="--d:.24s">
     <h2><span class="chip">⏱</span> Mes simulations récentes
       <button id="btn-refresh-sims" class="btn btn-ghost btn-sm" style="margin-left:auto">↻</button></h2>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th>Date</th><th>Matricule</th><th>Site</th><th>Profils</th><th>Points</th><th>Prime</th></tr></thead>
+        <thead>
+          <tr><th>Date</th><th>Matricule</th><th>Site</th><th>Activités</th><th>Prime</th></tr>
+        </thead>
         <tbody id="my-sims-body"></tbody>
       </table>
     </div>
     <p class="muted small">Ces simulations sont propres à votre session — personne d'autre ne les voit.</p>
   </section>
+
 </main>
 
+<datalist id="msa-list"></datalist>
 <div id="toasts"></div>
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
