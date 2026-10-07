@@ -137,8 +137,9 @@ async function resetFromFile() {
 function profilRow(label, pts) {
   const div = document.createElement("div"); div.className = "pp-row";
   div.innerHTML = `
-    <input class="pp-label" placeholder="Nom du profil (ex : Leader)" value="${esc(label)}"/>
-    <input class="pp-pts" type="number" min="0" max="20" value="${pts}"/> pt(s)
+    <input class="pp-label" placeholder="Code profil (ex : SI)" value="${esc(label)}"/>
+    <input class="pp-pts" type="number" min="0" max="20" placeholder="vide"
+           value="${pts ?? ""}"/> pt(s)
     <button class="btn btn-danger btn-sm" title="Supprimer">✕</button>`;
   div.querySelector("button").onclick = () => div.remove();
   return div;
@@ -208,11 +209,15 @@ async function savePayplan() {
   const profils = {};
   for (const row of document.querySelectorAll("#pp-profiles .pp-row")) {
     const l = row.querySelector(".pp-label").value.trim();
-    const p = parseInt(row.querySelector(".pp-pts").value);
+    const raw = row.querySelector(".pp-pts").value.trim();
     if (l) {
       if (profils[l] != null) { toast("Profil en double : " + l, "error"); return; }
-      if (isNaN(p) || p < 0) { toast("Points invalides pour « " + l + " ».", "error"); return; }
-      profils[l] = p;
+      if (raw === "") { profils[l] = null; }   // vide
+      else {
+        const p = parseInt(raw);
+        if (isNaN(p) || p < 0) { toast("Points invalides pour « " + l + " ».", "error"); return; }
+        profils[l] = p;
+      }
     }
   }
   if (!Object.keys(profils).length) { toast("Au moins un profil est requis.", "error"); return; }
