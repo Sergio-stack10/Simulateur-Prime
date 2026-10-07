@@ -258,4 +258,14 @@ body.login-page{min-height:100vh;display:flex;align-items:center;justify-content
 .calc-details{margin-top:12px}
 .calc-details summary{cursor:pointer;color:var(--primary);font-weight:600;font-size:.9rem}
 @media (max-width:720px){.grid-act{grid-template-columns:1fr}}
+
+/* ---------- v4 : référentiel & résolution MSA ---------- */
+.msa-resolved{display:inline-flex;align-items:center;gap:6px;margin-top:4px;
+  font-size:.82rem;font-weight:600;color:var(--primary-dark)}
+.msa-resolved .dot{width:8px;height:8px;border-radius:50%;
+  background:var(--success);animation:pulse 1.5s infinite}
+.msa-resolved.unknown{color:var(--error)}
+.msa-resolved.unknown .dot{background:var(--error)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.table input{padding:7px 9px;font-size:.88rem}
 }
