@@ -66,8 +66,9 @@
   <section class="card reveal" style="--d:.2s">
     <h2><span class="chip">3</span> Activités du mois
         <span class="muted small" id="act-count" style="margin-left:auto"></span></h2>
-    <p class="muted small">Une activité = un projet (code MSA) + ses 3 profils + vos heures.
-       La prime est calculée par activité, puis proratisée selon les heures passées sur chacune.</p>
+    <p class="muted small">Une activité = un ID d'activité (le MSA s'affiche automatiquement)
+       + ses 3 profils (SI / F / L) + vos heures. Chaque activité a son montant base,
+       ensuite proratisé : base × (heures activité ÷ heures totales).</p>
     <div id="activites"></div>
     <div class="act-toolbar">
       <button id="btn-add-act" class="btn btn-ghost">＋ Ajouter une activité</button>
@@ -96,7 +97,7 @@
 
 </main>
 
-<datalist id="msa-list"></datalist>
+<datalist id="act-list"></datalist>
 <div id="toasts"></div>
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
