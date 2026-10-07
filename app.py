@@ -14,7 +14,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, render_template, request, session
 
-from db import get_db, get_payplan, save_payplan
+from db import get_db, get_payplan, save_payplan, reset_payplan
 from payplan_config import calculate_prime
 
 load_dotenv()
@@ -53,6 +53,14 @@ def derive_site(location: str) -> str:
 
 def derive_typo(title: str) -> str:
     return "TECH" if TECH_PATTERN.search(title or "") else "OPS"
+
+def extract_msa_code(msa_full: str) -> str:
+    """'16152 - Orange - WHFR1006' -> 'WHFR1006'."""
+    s = str(msa_full or "").strip()
+    if not s:
+        return ""
+    parts = [p.strip() for p in s.split(" - ")]
+    return parts[-1] if parts and parts[-1] else s
 
 def parse_hire_date(value):
     if value is None:
@@ -182,6 +190,14 @@ def api_payplan_put():
     return jsonify({"ok": True, "message": "Payplan enregistré.",
                     "profils": profils, "regles": regles})
 
+@app.post("/api/payplan/reset")
+@admin_required
+def api_payplan_reset():
+    reset_payplan()
+    profils, regles = get_payplan()
+    return jsonify({"ok": True, "message": "Payplan réinitialisé depuis payplan_config.py.",
+                    "profils": profils, "regles": regles})
+
 def _validate_profils(p):
     if not isinstance(p, dict) or not p:
         raise ValueError("Profils invalides.")
@@ -196,6 +212,17 @@ def _validate_profils(p):
         out[k] = v
     return out
 
+def _val_date(v):
+    v = str(v or "").strip()
+    if not v or v.lower() in ("none", "null"):
+        return None
+    for f in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(v, f).date().isoformat()
+        except ValueError:
+            continue
+    raise ValueError(f"Date invalide : « {v} » (AAAA-MM-JJ)")
+
 def _validate_regles(rs):
     if not isinstance(rs, list) or not rs:
         raise ValueError("Au moins une règle est requise.")
@@ -204,8 +231,12 @@ def _validate_regles(rs):
         nom = str(r.get("nom") or f"Règle {i}").strip()
         try:
             sites = [s.strip().upper() for s in str(r.get("sites") or "").split(",") if s.strip()]
-            if not sites:
-                raise ValueError("aucun site")
+            msa = [m.strip().upper() for m in str(r.get("msa") or "").split(",") if m.strip()]
+            avant, apres = _val_date(r.get("embauche_avant")), _val_date(r.get("embauche_apres"))
+            try:
+                index = int(r.get("index") or i * 10)
+            except (TypeError, ValueError):
+                index = i * 10
             amin = int(r.get("anciennete_min") or 0)
             raw_max = r.get("anciennete_max")
             amax = int(raw_max) if raw_max not in (None, "", "null") else None
@@ -219,10 +250,11 @@ def _validate_regles(rs):
             raise ValueError(f"Règle « {nom} » invalide : {e}")
         if amax is not None and amin > amax:
             raise ValueError(f"Règle « {nom} » : ancienneté min > max")
-        out.append({"nom": nom, "sites": sites, "anciennete_min": amin,
-                    "anciennete_max": amax, "nb_mois_profil": nb, "montants": montants,
-                    "explication": str(r.get("explication") or ""),
-                    "embauche_avant": None, "embauche_apres": None})
+        out.append({"nom": nom, "sites": sites, "msa": msa,
+                    "embauche_avant": avant, "embauche_apres": apres, "index": index,
+                    "anciennete_min": amin, "anciennete_max": amax,
+                    "nb_mois_profil": nb, "montants": montants,
+                    "explication": str(r.get("explication") or "")})
     return out
 
 # ----------------------------------------------------------------- Employee
@@ -235,7 +267,14 @@ def api_employee(matricule: str):
         return jsonify({"ok": False, "error": f"Matricule « {matricule} » introuvable "
                         "dans l'extraction ACTIF."}), 404
     e.pop("_id", None)
+    e.setdefault("msa_code", extract_msa_code(e.get("msa")))
     return jsonify({"ok": True, "data": e})
+
+@app.get("/api/msas")
+@login_required
+def api_msas():
+    codes = get_db().employees.distinct("msa_code")
+    return jsonify({"ok": True, "data": sorted(c for c in codes if c)})
 
 # ---------------------------------------------------------------- Calculate
 @app.post("/api/calculate")
@@ -243,11 +282,10 @@ def api_employee(matricule: str):
 def api_calculate():
     p = request.get_json(silent=True) or {}
     profils, regles = get_payplan()
-
     hire_raw = str(p.get("hire_date") or "").strip()
     site = str(p.get("site") or "").strip().upper()
-    profiles = p.get("profiles") or []
     ref_raw = str(p.get("reference_date") or "").strip()
+    activites = p.get("activites") or []
 
     if not hire_raw:
         return jsonify({"ok": False, "error": "La date d'embauche est obligatoire."}), 400
@@ -257,25 +295,38 @@ def api_calculate():
         return jsonify({"ok": False, "error": "Date d'embauche invalide."}), 400
     if not site:
         return jsonify({"ok": False, "error": "Le site est obligatoire."}), 400
-    if (not isinstance(profiles, list) or len(profiles) != 3
-            or any(x not in profils for x in profiles)):
-        return jsonify({"ok": False, "error": "3 profils attendus parmi : "
-                        + ", ".join(profils) + "."}), 400
+    if not isinstance(activites, list) or not 1 <= len(activites) <= 7:
+        return jsonify({"ok": False, "error": "Renseignez entre 1 et 7 activités."}), 400
     try:
         reference_date = date.fromisoformat(ref_raw) if ref_raw else date.today()
     except ValueError:
         return jsonify({"ok": False, "error": "Date de référence invalide."}), 400
 
-    result = calculate_prime(hire_date, site, profiles, reference_date,
-                             profile_points=profils, rules=regles)
+    clean = []
+    for i, a in enumerate(activites, 1):
+        msa = str(a.get("msa") or "").strip().upper()
+        profiles = a.get("profiles") or []
+        try:
+            heures = float(a.get("heures") or 0)
+        except (TypeError, ValueError):
+            heures = 0.0
+        if not msa:
+            return jsonify({"ok": False, "error": f"Activité {i} : code MSA manquant."}), 400
+        if heures <= 0:
+            return jsonify({"ok": False, "error": f"Activité {i} : heures > 0 requises."}), 400
+        if len(profiles) != 3 or any(x not in profils for x in profiles):
+            return jsonify({"ok": False, "error": f"Activité {i} : 3 profils attendus parmi : "
+                            + ", ".join(profils) + "."}), 400
+        clean.append({"msa": msa, "heures": heures, "profiles": profiles})
+
+    result = calculate_prime(hire_date, site, clean, reference_date, profils, regles)
 
     u = current_user()
     matricule = str(p.get("matricule") or "").strip()
     emp = (get_db().employees.find_one({"mat_wkd": _norm_mat(matricule).upper()}, {"nom": 1})
            if matricule else None)
-    record = dict(result, matricule=matricule, site=site, profiles=profiles,
-                  nom=(emp or {}).get("nom"), sid=u["sid"], role=u["role"],
-                  created_at=now_utc())
+    record = dict(result, matricule=matricule, site=site, nom=(emp or {}).get("nom"),
+                  sid=u["sid"], role=u["role"], created_at=now_utc())
     try:
         get_db().simulations.insert_one(record)
     except Exception:
@@ -334,6 +385,7 @@ def api_upload():
             "msa": _clean(r.get("MSA")) if "MSA" in df.columns else "",
             "statut_wkd": "ACTIVE",
             "hire_date": hire.isoformat() if hire else None,
+            "msa_code": extract_msa_code(_clean(r.get("MSA")) if "MSA" in df.columns else ""),
         })
 
     db = get_db()
