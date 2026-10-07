@@ -20,7 +20,7 @@
 =====================================================================
 """
 
-PROFILE_POINTS = {"SI": 0, "F": 1, "L": 3}
+PROFILE_POINTS = {"Leader": 3, "Fragile": 1, "Soutien Intense": 0, "Non évalué": None}
 MIN_ANCIENNETE_MOIS = 4
 
 PAYPLAN_RULES = [
@@ -137,18 +137,24 @@ def _iso(d):
         return None
 
 def somme_points_profils(profiles, nb_mois, profile_points):
+    """None = profil « Non évalué » : vide (aucun point ajouté, affiché « vide »)."""
     labels = ["M1", "M2", "M3"]
     retenus = profiles if nb_mois >= len(profiles) else profiles[-nb_mois:]
     offset = len(profiles) - len(retenus)
     total, detail = 0, []
+
+    def pts_of(p):
+        return profile_points.get(p) if p in profile_points else 0
+
     for j in range(offset):
         detail.append({"mois": labels[j], "profil": profiles[j],
-                       "points": profile_points.get(profiles[j], 0), "pris_en_compte": False})
+                       "points": pts_of(profiles[j]), "pris_en_compte": False})
     for i, p in enumerate(retenus):
-        pts = profile_points.get(p, 0)
-        total += pts
-        detail.append({"mois": labels[offset + i], "profil": p, "points": pts,
-                       "pris_en_compte": True})
+        v = pts_of(p)
+        if v is not None:
+            total += v
+        detail.append({"mois": labels[offset + i], "profil": p,
+                       "points": v, "pris_en_compte": True})
     return total, detail
 
 def trouver_regle(regles, site, msa, anciennete_mois, hire_date):
