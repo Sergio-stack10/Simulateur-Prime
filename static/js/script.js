@@ -79,10 +79,15 @@ async function loadRef() {
     });
   } catch (e) { console.error(e); }
 }
+const PROFILE_LABELS = { "L": "Leader", "F": "Fragile", "SI": "Soutien Intense" };
+
 function profileOptionsHTML() {
   return `<option value="" disabled selected>Sélectionner…</option>` +
-    Object.entries(PP.profils).map(([l, p]) =>
-      `<option value="${esc(l)}">${esc(l)} · ${p} pt</option>`).join("");
+    Object.entries(PP.profils).map(([code, pts]) => {
+      const nom = PROFILE_LABELS[code] || code;
+      const val = (pts === null || pts === undefined) ? "vide" : pts + " pt";
+      return `<option value="${esc(code)}">${esc(code)} — ${esc(nom)} · ${val}</option>`;
+    }).join("");
 }
 
 /* ------------------ Activités ------------------ */
