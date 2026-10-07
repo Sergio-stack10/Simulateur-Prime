@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SimuPrime — Administration</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body class="app-page">
+
+<nav class="topbar">
+  <div class="brand">
+    <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo"/>
+    <span>SimuPrime <em class="brand-admin">Admin</em></span>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-ghost btn-sm" href="/">← Simulateur</a>
+    <span class="badge-role">ADMIN</span>
+    <button id="btn-logout" class="btn btn-ghost btn-sm">Déconnexion</button>
+  </div>
+</nav>
+
+<main class="app-main">
+  <section class="hero reveal"><h1>Panneau d'administration</h1>
+    <p>Gestion de l'extraction ACTIF, du payplan et de l'historique des simulations.</p></section>
+
+  <section class="stats-grid reveal" style="--d:.06s">
+    <div class="stat-card"><span class="stat-chip">👥</span>
+      <div><span class="stat-value" id="stat-employees">0</span>
+      <span class="stat-label">Collaborateurs ACTIF</span></div></div>
+    <div class="stat-card"><span class="stat-chip">🧮</span>
+      <div><span class="stat-value" id="stat-sims">0</span>
+      <span class="stat-label">Simulations</span></div></div>
+    <div class="stat-card"><span class="stat-chip">🗄️</span>
+      <div><span class="stat-value stat-small" id="stat-db">—</span>
+      <span class="stat-label">Base de données</span></div></div>
+    <div class="stat-card"><span class="stat-chip">📅</span>
+      <div><span class="stat-value stat-small" id="stat-actif">—</span>
+      <span class="stat-label">Dernier chargement ACTIF</span></div></div>
+  </section>
+
+  <section class="card reveal" style="--d:.12s">
+    <h2><span class="chip">⬆</span> Extraction ACTIF</h2>
+    <div class="dropzone" id="dropzone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/>
+      </svg>
+      <p><b>Glissez-déposez</b> votre fichier <code>ACTIF.xlsx</code> ici<br/>
+         <span class="muted">ou cliquez pour parcourir</span></p>
+    </div>
+    <input type="file" id="file-actif" accept=".xlsx,.xls" hidden/>
+    <p id="upload-status" class="muted small"></p>
+  </section>
+
+  <section class="card reveal" style="--d:.18s">
+    <h2><span class="chip">⚙</span> Payplan</h2>
+    <h3 class="pp-subtitle">Points par profil</h3>
+    <div id="pp-profiles" class="pp-rows"></div>
+    <button id="pp-add-profil" class="btn btn-ghost btn-sm">+ Profil</button>
+
+    <h3 class="pp-subtitle">Règles (la première règle qui correspond s'applique)</h3>
+    <div id="pp-rules"></div>
+
+    <div class="pp-actions">
+      <button id="pp-add-rule" class="btn btn-ghost">+ Ajouter une règle</button>
+      <span style="flex:1"></span>
+      <button id="pp-reset" class="btn btn-ghost">↻ Recharger</button>
+      <button id="pp-save" class="btn btn-primary">💾 Enregistrer le payplan</button>
+    </div>
+    <p class="muted small">Les modifications s'appliquent immédiatement aux calculs —
+       sans redéploiement.</p>
+  </section>
+
+  <section class="card reveal" style="--d:.24s">
+    <h2><span class="chip">🗂</span> Historique des simulations
+      <span class="muted small" id="sims-count" style="margin-left:auto"></span></h2>
+    <div class="sims-toolbar">
+      <input id="sims-search" type="text" placeholder="🔎 Filtrer (matricule, nom, site…)"/>
+      <button id="btn-refresh-admin-sims" class="btn btn-ghost btn-sm">↻</button>
+      <button id="btn-export-csv" class="btn btn-primary btn-sm">⬇ Export CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Date</th><th>Matricule</th><th>Nom</th><th>Site</th>
+          <th>Profils</th><th>Points</th><th>Prime</th><th>Statut</th></tr></thead>
+        <tbody id="admin-sims-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div id="toasts"></div>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>
