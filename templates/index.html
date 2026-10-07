@@ -1,90 +1,83 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Calculateur Prime de Régularité — Espace Collaborateur</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SimuPrime — Simulateur de prime</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
-<body>
-  <header class="app-header">
-    <h1>Calculateur Prime de Régularité</h1>
-    <p>ESPACE COLLABORATEUR — Ma situation réelle · recherche par matricule (Person Id)</p>
-  </header>
+<body class="app-page">
 
-  <main class="container">
+<nav class="topbar">
+  <div class="brand">
+    <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo"/>
+    <span>SimuPrime</span>
+  </div>
+  <div class="topbar-actions">
+    {% if role == 'admin' %}<a class="btn btn-ghost btn-sm" href="/admin">⚙ Panneau admin</a>{% endif %}
+    <span class="badge-role">{{ 'ADMIN' if role == 'admin' else 'UTILISATEUR' }}</span>
+    <button id="btn-logout" class="btn btn-ghost btn-sm">Déconnexion</button>
+  </div>
+</nav>
 
-    <!-- ===== 1. Identification ===== -->
-    <section class="card">
-      <h2>1 · Identifier le collaborateur</h2>
-      <div class="search-bar">
-        <input id="matricule" type="text" autocomplete="off"
-               placeholder="Matricule WKD / Person Id (ex : 102544211) ou n° de paie (W…)" />
-        <button id="btn-search" class="btn primary">Rechercher</button>
+<main class="app-main">
+  <section class="hero reveal" style="--d:0s">
+    <h1>Ma situation réelle</h1>
+    <p>Recherchez votre matricule, renseignez vos profils et découvrez votre prime estimée.</p>
+  </section>
+
+  <section class="card reveal" style="--d:.08s">
+    <h2><span class="chip">1</span> Identifier le collaborateur</h2>
+    <div class="search-bar">
+      <input id="matricule" type="text" autocomplete="off"
+             placeholder="Matricule WKD (ex : 102573627) ou n° de paie (W…)"/>
+      <button id="btn-search" class="btn btn-primary">🔍 Rechercher</button>
+    </div>
+    <div id="employee-result"></div>
+  </section>
+
+  <section class="card reveal" style="--d:.16s">
+    <h2><span class="chip">2</span> Paramètres de la simulation</h2>
+    <div class="grid-3">
+      <div class="field"><label for="hire-date">Date d'embauche *</label>
+        <input id="hire-date" type="date"/></div>
+      <div class="field"><label for="reference-date">Date de référence</label>
+        <input id="reference-date" type="date"/></div>
+      <div class="field"><label for="site">Site (payplan) *</label>
+        <select id="site">
+          <option value="ANTA">ANTA — Antananarivo</option>
+          <option value="TMM">TMM — Tamatave</option>
+          <option value="AUTRE">AUTRE</option>
+        </select></div>
+    </div>
+    <div class="field">
+      <label>Profils des 3 derniers mois <span class="muted">(M1 = plus ancien → M3 = plus récent)</span> *</label>
+      <div class="profile-row">
+        <select class="profile" data-month="M1"></select>
+        <select class="profile" data-month="M2"></select>
+        <select class="profile" data-month="M3"></select>
       </div>
-      <div id="employee-result"></div>
+    </div>
+    <button id="btn-calculate" class="btn btn-primary btn-block btn-lg">✨ Calculer ma prime</button>
+  </section>
 
-      <div class="upload-zone">
-        <span class="muted">Mettre à jour l'extraction ACTIF :</span>
-        <input id="file-actif" type="file" accept=".xlsx,.xls" />
-        <button id="btn-upload" class="btn ghost">Charger</button>
-        <span id="upload-status" class="muted"></span>
-      </div>
-    </section>
+  <section class="card" id="result-card" hidden></section>
 
-    <!-- ===== 2. Paramètres ===== -->
-    <section class="card">
-      <h2>2 · Paramètres de la simulation</h2>
+  <section class="card reveal" style="--d:.24s">
+    <h2><span class="chip">⏱</span> Mes simulations récentes
+      <button id="btn-refresh-sims" class="btn btn-ghost btn-sm" style="margin-left:auto">↻</button></h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Date</th><th>Matricule</th><th>Site</th><th>Profils</th><th>Points</th><th>Prime</th></tr></thead>
+        <tbody id="my-sims-body"></tbody>
+      </table>
+    </div>
+    <p class="muted small">Ces simulations sont propres à votre session — personne d'autre ne les voit.</p>
+  </section>
+</main>
 
-      <div class="grid-3">
-        <div class="field">
-          <label for="hire-date">Date d'embauche *</label>
-          <input id="hire-date" type="date" />
-        </div>
-        <div class="field">
-          <label for="reference-date">Date de référence</label>
-          <input id="reference-date" type="date" />
-          <small class="muted">Date à laquelle l'ancienneté est calculée (défaut : aujourd'hui).</small>
-        </div>
-        <div class="field">
-          <label for="site">Site (payplan) *</label>
-          <select id="site">
-            <option value="ANTA">ANTA — Antananarivo</option>
-            <option value="TMM">TMM — Tamatave</option>
-            <option value="AUTRE">AUTRE</option>
-          </select>
-          <small class="muted">Renseigné automatiquement après recherche du matricule.</small>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Profils des 3 derniers mois <span class="muted">(M1 = plus ancien → M3 = plus récent)</span> *</label>
-        <div class="profile-row">
-          <select class="profile" data-month="M1"></select>
-          <select class="profile" data-month="M2"></select>
-          <select class="profile" data-month="M3"></select>
-        </div>
-      </div>
-
-      <button id="btn-calculate" class="btn primary big">Calculer ma prime</button>
-    </section>
-
-    <!-- ===== 3. Résultat ===== -->
-    <section class="card" id="result-card" hidden></section>
-
-    <!-- ===== Référence payplan ===== -->
-    <section class="card">
-      <details>
-        <summary>Référence — Payplan appliqué (cliquer pour déplier)</summary>
-        <div id="payplan-table"></div>
-      </details>
-    </section>
-  </main>
-
-  <footer class="app-footer">
-    <p>Simulation indicative — les valeurs du payplan sont paramétrables dans <code>payplan_config.py</code>.</p>
-  </footer>
-
-  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+<div id="toasts"></div>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
