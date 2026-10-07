@@ -1,7 +1,10 @@
-/* SimuPrime v3 — page utilisateur (multi-activités) */
+/* ============================================================
+   SimuPrime v4 — Activités par ID → MSA auto · SI/F/L · prorata
+   ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
+const REF = {};                 // { "W0ZQPJ": {msa, libelle} }
 let employee = null;
 const MAX_ACT = 7;
 
@@ -40,10 +43,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("#btn-refresh-sims").onclick = loadMySims;
   $("#btn-add-act").onclick = () => addActivity();
   $("#btn-eom").onclick = () => { endOfMonth(); toast("Date de référence : fin du mois courant."); };
-  endOfMonth();   // défaut = fin du mois de performance
+  endOfMonth();
   await loadPayplan();
-  await loadMsaList();
-  addActivity();  // 1 activité par défaut
+  await loadRef();
+  addActivity();
   await loadMySims();
 });
 
@@ -63,12 +66,18 @@ async function loadPayplan() {
     PP.profils = j.profils; PP.regles = j.regles;
   } catch (e) { console.error(e); }
 }
-async function loadMsaList() {
+async function loadRef() {
   try {
-    const j = await api("/api/msas");
-    if (j.ok) $("#msa-list").innerHTML =
-      (j.data || []).map((c) => `<option value="${esc(c)}"></option>`).join("");
-  } catch (e) {}
+    const j = await api("/api/ref-msa");
+    if (!j.ok) return;
+    const dl = $("#act-list"); dl.innerHTML = "";
+    (j.data || []).forEach((r) => {
+      REF[r.id] = { msa: r.msa, libelle: r.libelle || "" };
+      const o = document.createElement("option");
+      o.value = r.id; o.label = r.msa;
+      dl.appendChild(o);
+    });
+  } catch (e) { console.error(e); }
 }
 function profileOptionsHTML() {
   return `<option value="" disabled selected>Sélectionner…</option>` +
@@ -77,7 +86,7 @@ function profileOptionsHTML() {
 }
 
 /* ------------------ Activités ------------------ */
-function addActivity(msa = "") {
+function addActivity(activityId = "") {
   const cont = $("#activites");
   if (cont.children.length >= MAX_ACT) { toast(`Maximum ${MAX_ACT} activités.`, "error"); return; }
   const div = document.createElement("div");
@@ -91,8 +100,11 @@ function addActivity(msa = "") {
     </div>
     <div class="act-body">
       <div class="grid-act">
-        <div class="field"><label>Projet (code MSA) *</label>
-          <input class="a-msa" list="msa-list" placeholder="ex : WHFR1006" value="${esc(msa)}"/></div>
+        <div class="field">
+          <label>ID de l'activité *</label>
+          <input class="a-act" list="act-list" placeholder="ex : W0ZQPJ" value="${esc(activityId)}"/>
+          <span class="msa-resolved" hidden><span class="dot"></span><span class="txt"></span></span>
+        </div>
         <div class="field"><label>Heures sur l'activité *</label>
           <input class="a-heures" type="number" min="0" step="0.5" placeholder="ex : 105"/></div>
       </div>
@@ -103,6 +115,24 @@ function addActivity(msa = "") {
           <select class="profile a-p3">${profileOptionsHTML()}</select>
         </div></div>
     </div>`;
+
+  const actInput = div.querySelector(".a-act");
+  const resolve = () => {
+    const v = actInput.value.trim().toUpperCase();
+    const box = div.querySelector(".msa-resolved");
+    if (!v) { box.hidden = true; }
+    else if (REF[v]) {
+      box.hidden = false; box.classList.remove("unknown");
+      box.querySelector(".txt").textContent =
+        "MSA : " + REF[v].msa + (REF[v].libelle ? " · " + REF[v].libelle : "");
+    } else {
+      box.hidden = false; box.classList.add("unknown");
+      box.querySelector(".txt").textContent = "ID inconnu — vérifiez le référentiel (Admin)";
+    }
+    refreshActs();
+  };
+  actInput.addEventListener("input", resolve);
+
   div.querySelector(".act-toggle").onclick = () => {
     div.classList.toggle("collapsed");
     div.querySelector(".act-toggle").textContent =
@@ -112,22 +142,23 @@ function addActivity(msa = "") {
     if ($("#activites").children.length <= 1) { toast("Au moins une activité requise.", "error"); return; }
     div.remove(); refreshActs();
   };
-  div.querySelector(".a-msa").addEventListener("input", refreshActs);
   div.querySelector(".a-heures").addEventListener("input", refreshActs);
   cont.appendChild(div);
-  refreshActs();
+  resolve();
 }
+
 function refreshActs() {
   let total = 0;
   [...$("#activites").children].forEach((c, i) => {
     c.querySelector(".act-title").textContent = "Activité " + (i + 1);
-    const msa = c.querySelector(".a-msa").value.trim().toUpperCase();
-    c.querySelector(".a-badge").textContent = msa || "—";
+    const id = c.querySelector(".a-act").value.trim().toUpperCase();
+    const badge = c.querySelector(".a-badge");
+    badge.textContent = id ? (REF[id] ? id + " → " + REF[id].msa : id + " ⚠") : "—";
     const h = parseFloat(c.querySelector(".a-heures").value);
     if (!isNaN(h)) total += h;
   });
   $("#act-count").textContent = $("#activites").children.length + " / " + MAX_ACT;
-  $("#act-total-h").textContent = total > 0 ? "Total : " + fmt.format(total) + " h" : "";
+  $("#act-total-h").textContent = total > 0 ? "Heures totales : " + fmt.format(total) + " h" : "";
 }
 
 /* ------------------ Recherche ------------------ */
@@ -144,9 +175,9 @@ async function searchEmployee() {
     if (j.data.hire_date) $("#hire-date").value = j.data.hire_date;
     if (j.data.site) $("#site").value = j.data.site;
     const first = $("#activites").querySelector(".act-card");
-    if (first && !first.querySelector(".a-msa").value && j.data.msa_code) {
-      first.querySelector(".a-msa").value = j.data.msa_code;
-      refreshActs();
+    if (first && !first.querySelector(".a-act").value && j.data.projet_code) {
+      first.querySelector(".a-act").value = j.data.projet_code;
+      first.querySelector(".a-act").dispatchEvent(new Event("input"));
     }
   } catch (e) { box.innerHTML = `<div class="alert error">Erreur réseau.</div>`; }
 }
@@ -164,8 +195,8 @@ function renderEmployee(e) {
       <div class="emp-grid">
         ${info("Matricule WKD", e.matricule)}${info("N° paie", e.matricule_paie)}
         ${info("Typo", e.typo)}${info("Site (payplan)", e.site)}
-        ${info("MSA (code)", e.msa_code)}${info("Projet", e.projet)}
-        ${info("MSA (libellé)", e.msa)}${info("Date d'embauche", e.hire_date)}
+        ${info("ID activité", e.projet_code)}${info("MSA (code)", e.msa_code)}
+        ${info("Projet", e.projet)}${info("Date d'embauche", e.hire_date)}
       </div>
     </div>`;
 }
@@ -175,14 +206,15 @@ async function calculate() {
   const hireDate = $("#hire-date").value, site = $("#site").value;
   const referenceDate = $("#reference-date").value;
   const acts = [...$("#activites").children].map((c) => ({
-    msa: c.querySelector(".a-msa").value.trim(),
+    activity_id: c.querySelector(".a-act").value.trim().toUpperCase(),
     heures: parseFloat(c.querySelector(".a-heures").value),
     profiles: [".a-p1", ".a-p2", ".a-p3"].map((s) => c.querySelector(s).value),
   }));
   if (!hireDate) { toast("Date d'embauche manquante.", "error"); return; }
   for (let i = 0; i < acts.length; i++) {
     const n = i + 1;
-    if (!acts[i].msa) { toast(`Activité ${n} : code MSA manquant.`, "error"); return; }
+    if (!acts[i].activity_id) { toast(`Activité ${n} : ID d'activité manquant.`, "error"); return; }
+    if (!REF[acts[i].activity_id]) { toast(`Activité ${n} : ID inconnu dans le référentiel.`, "error"); return; }
     if (!acts[i].heures || acts[i].heures <= 0) { toast(`Activité ${n} : heures > 0 requises.`, "error"); return; }
     if (acts[i].profiles.some((p) => !p)) { toast(`Activité ${n} : 3 profils requis.`, "error"); return; }
   }
@@ -207,14 +239,14 @@ async function calculate() {
 function renderResult(d) {
   const card = $("#result-card"); card.hidden = false;
   const acts = d.activites || [];
-  const maxPts = Math.max(...Object.values(PP.profils), 1);
   const rows = acts.map((a) => `
     <tr class="${a.eligible ? "" : "off"}">
-      <td><b>${esc(a.msa)}</b><br/><span class="muted small">${esc(a.regle || a.explication || "—")}</span></td>
+      <td><b>${esc(a.activity_id || a.msa)}</b> → ${esc(a.msa)}<br/>
+          <span class="muted small">${esc(a.regle || a.explication || "—")}</span></td>
       <td class="center">${fmt.format(a.heures)} h</td>
       <td class="center">${a.part ?? 0}%</td>
-      <td class="center"><b>${a.total_points}</b>/${(a.nb_mois_profil || 3) * maxPts}</td>
-      <td>${a.eligible ? fmt.format(a.montant) + " Ar" : "0 Ar"}</td>
+      <td class="center"><b>${a.total_points}</b> pts</td>
+      <td>${a.eligible ? fmt.format(a.montant) + " Ar" : "—"}</td>
       <td><b>${fmt.format(a.montant_proratise || 0)} Ar</b></td>
     </tr>`).join("");
   card.innerHTML = `
@@ -224,22 +256,24 @@ function renderResult(d) {
       <div class="result-box">
         <span class="result-label">Activités calculées</span>
         <span class="result-value">${acts.filter((a) => a.eligible).length}<small>/${acts.length}</small></span>
-        <span class="result-sub">Total : ${fmt.format(d.total_heures || 0)} h</span>
+        <span class="result-sub">Heures totales : ${fmt.format(d.total_heures || 0)} h</span>
       </div>
       <div class="result-box highlight">
         <span class="result-label">Prime de régularité estimée</span>
         <span class="result-value gold" id="rv-amount">0</span>
-        <span class="result-sub">Ancienneté : ${d.anciennete_affichee} mois · prorata heures</span>
+        <span class="result-sub">Ancienneté : ${d.anciennete_affichee} mois</span>
       </div>
     </div>
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Activité (MSA)</th><th>Heures</th><th>Part</th><th>Points</th>
-        <th>Montant activité</th><th>Montant proratisé</th></tr></thead>
+      <thead><tr><th>Activité (ID → MSA)</th><th>Heures</th><th>Part</th><th>Points</th>
+        <th>Montant base</th><th>Montant proratisé</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-    <details class="calc-details"><summary>Comment est calculé le prorata ?</summary>
-      <p class="muted small">Prime finale = Σ (montant de l'activité × heures de l'activité ÷
-      ${fmt.format(d.total_heures || 0)} h). Les activités sans règle applicable comptent pour
-      0 Ar mais leurs heures entrent dans le prorata.</p></details>`;
+    <details class="calc-details"><summary>Formule de proratisation</summary>
+      <p class="muted small">Prime finale = Σ [ Montant base de l'activité ×
+      (heures de l'activité ÷ ${fmt.format(d.total_heures || 0)} h) ].<br/>
+      Exemple : base ${acts[0] && acts[0].montant ? fmt.format(acts[0].montant) + " Ar" : "…"} ×
+      (${acts[0] ? fmt.format(acts[0].heures) : "…"} h ÷ ${fmt.format(d.total_heures || 0)} h)
+      = ${acts[0] ? fmt.format(acts[0].montant_proratise || 0) + " Ar" : "…"}</p></details>`;
   card.scrollIntoView({ behavior: "smooth", block: "start" });
   requestAnimationFrame(() => countUp($("#rv-amount"), d.montant_prime || 0, { suffix: " Ar" }));
 }
@@ -248,8 +282,9 @@ async function loadMySims() {
   try {
     const j = await api("/api/simulations?scope=mine&limit=10");
     const rows = (j.data || []).map((r) => {
-      const acts = r.activites ? r.activites.map((a) => a.msa).join(", ")
-                               : (r.profiles || []).join(" / ");
+      const acts = r.activites
+        ? r.activites.map((a) => a.activity_id || a.msa).join(", ")
+        : (r.profiles || []).join(" / ");
       return `<tr><td>${new Date(r.created_at).toLocaleString("fr-FR")}</td>
         <td>${esc(r.matricule || "—")}</td><td>${esc(r.site || "")}</td>
         <td>${esc(acts || "—")}</td>
