@@ -1,28 +1,36 @@
 # -*- coding: utf-8 -*-
 """
-SIMULATEUR DE PRIME DE RÉGULARITÉ — Backend (production, MongoDB Atlas)
+SimuPrime v2 — auth par rôles, payplan éditable en BDD,
+historique des simulations isolé par session.
 """
 import os
 import re
+import uuid
+import secrets
 from datetime import date, datetime, timezone
+from functools import wraps
 
 import pandas as pd
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, session
 
-from db import get_db
-from payplan_config import PAYPLAN_RULES, PROFILE_POINTS, calculate_prime
+from db import get_db, get_payplan, save_payplan
+from payplan_config import calculate_prime
 
-load_dotenv()  # charge .env en local uniquement (sur Render : dashboard)
+load_dotenv()
+
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or os.environ.get("ADMIN_TOKEN") or ""
 
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")  # requis pour l'upload/historique
-
-# ------------------------------------------------------------- Helpers
+# ------------------------------------------------------------------ Helpers
 SITE_KEYWORDS = {"ANTA": ("antananarivo", "tana"), "TMM": ("tamatave", "toamasina")}
 TECH_PATTERN = re.compile(
     r"d[ée]veloppeur|ing[ée]nieur|\bdev\b|technicien|informatique|"
     r"administrateur base|database|\bdata\b|\bbi\b|network|\bnoc\b|software", re.I)
+
+def now_utc():
+    return datetime.now(timezone.utc)
 
 def _norm_mat(v) -> str:
     if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -60,23 +68,92 @@ def parse_hire_date(value):
     except Exception:
         return None
 
-def admin_ok(request) -> bool:
-    """Protège les routes sensibles si ADMIN_TOKEN est configuré."""
-    if not ADMIN_TOKEN:
-        return True  # mode dev local
-    token = (request.headers.get("X-Admin-Token", "")
-             or request.args.get("token", "")
-             or request.form.get("admin_token", ""))
-    return token == ADMIN_TOKEN
+# -------------------------------------------------------------------- Auth
+def current_user():
+    if session.get("role") in ("user", "admin"):
+        return {"role": session["role"], "sid": session.get("sid", "")}
+    return None
 
-# ------------------------------------------------------------- Routes
+def _unauthorized():
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Session expirée — reconnectez-vous."}), 401
+    return redirect("/login")
+
+def _forbidden():
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Accès réservé à l'administrateur."}), 403
+    return redirect("/")
+
+def login_required(f):
+    @wraps(f)
+    def wrapper(*a, **k):
+        if not current_user():
+            return _unauthorized()
+        return f(*a, **k)
+    return wrapper
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*a, **k):
+        u = current_user()
+        if not u:
+            return _unauthorized()
+        if u["role"] != "admin":
+            return _forbidden()
+        return f(*a, **k)
+    return wrapper
+
+# ------------------------------------------------------------------- Pages
+@app.route("/login")
+def login_page():
+    u = current_user()
+    if u:
+        return redirect("/admin" if u["role"] == "admin" else "/")
+    return render_template("login.html")
+
 @app.route("/")
+@login_required
 def index():
-    return render_template("index.html")
+    return render_template("index.html", role=session["role"])
 
+@app.route("/admin")
+@admin_required
+def admin_page():
+    return render_template("admin.html", role="admin")
+
+# ----------------------------------------------------------------- Auth API
+@app.post("/api/auth/login")
+def auth_login():
+    d = request.get_json(silent=True) or {}
+    role = d.get("role")
+    if role == "user":
+        session.clear()
+        session.update(role="user", sid=uuid.uuid4().hex, logged_at=now_utc().isoformat())
+        return jsonify({"ok": True, "redirect": "/"})
+    if role == "admin":
+        if not ADMIN_PASSWORD:
+            return jsonify({"ok": False, "error": "Mot de passe admin non configuré "
+                            "(variable ADMIN_PASSWORD)."}), 503
+        if str(d.get("password") or "") != ADMIN_PASSWORD:
+            return jsonify({"ok": False, "error": "Mot de passe incorrect."}), 401
+        session.clear()
+        session.update(role="admin", sid=uuid.uuid4().hex, logged_at=now_utc().isoformat())
+        return jsonify({"ok": True, "redirect": "/admin"})
+    return jsonify({"ok": False, "error": "Rôle invalide."}), 400
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+@app.get("/api/auth/me")
+def auth_me():
+    u = current_user()
+    return jsonify({"ok": bool(u), "user": u})
+
+# ------------------------------------------------------------------- Public
 @app.route("/api/health")
 def health():
-    """Endpoint léger pour UptimeRobot + diagnostic DB."""
     try:
         get_db().command("ping")
         db_status = "connected"
@@ -84,24 +161,89 @@ def health():
         db_status = "error"
     return jsonify({"ok": True, "db": db_status})
 
-@app.route("/api/payplan")
-def api_payplan():
-    return jsonify({"ok": True, "profils": PROFILE_POINTS, "regles": PAYPLAN_RULES})
+# ------------------------------------------------------------------ Payplan
+@app.get("/api/payplan")
+@login_required
+def api_payplan_get():
+    profils, regles = get_payplan()
+    return jsonify({"ok": True, "profils": profils, "regles": regles})
 
+@app.put("/api/payplan")
+@admin_required
+def api_payplan_put():
+    d = request.get_json(silent=True) or {}
+    try:
+        profils = _validate_profils(d.get("profils"))
+        regles = _validate_regles(d.get("regles"))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    save_payplan(profils, regles)
+    profils, regles = get_payplan()
+    return jsonify({"ok": True, "message": "Payplan enregistré.",
+                    "profils": profils, "regles": regles})
+
+def _validate_profils(p):
+    if not isinstance(p, dict) or not p:
+        raise ValueError("Profils invalides.")
+    out = {}
+    for k, v in p.items():
+        k = str(k).strip()
+        if not k:
+            raise ValueError("Nom de profil vide.")
+        v = int(v)
+        if not 0 <= v <= 20:
+            raise ValueError(f"Points invalides pour « {k} » (0 à 20).")
+        out[k] = v
+    return out
+
+def _validate_regles(rs):
+    if not isinstance(rs, list) or not rs:
+        raise ValueError("Au moins une règle est requise.")
+    out = []
+    for i, r in enumerate(rs, 1):
+        nom = str(r.get("nom") or f"Règle {i}").strip()
+        try:
+            sites = [s.strip().upper() for s in str(r.get("sites") or "").split(",") if s.strip()]
+            if not sites:
+                raise ValueError("aucun site")
+            amin = int(r.get("anciennete_min") or 0)
+            raw_max = r.get("anciennete_max")
+            amax = int(raw_max) if raw_max not in (None, "", "null") else None
+            nb = int(r.get("nb_mois_profil") or 3)
+            if not 1 <= nb <= 3:
+                raise ValueError("nb_mois_profil doit être 1, 2 ou 3")
+            montants = {int(k): int(v) for k, v in dict(r.get("montants") or {}).items()}
+            if not montants:
+                raise ValueError("aucun montant défini")
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Règle « {nom} » invalide : {e}")
+        if amax is not None and amin > amax:
+            raise ValueError(f"Règle « {nom} » : ancienneté min > max")
+        out.append({"nom": nom, "sites": sites, "anciennete_min": amin,
+                    "anciennete_max": amax, "nb_mois_profil": nb, "montants": montants,
+                    "explication": str(r.get("explication") or ""),
+                    "embauche_avant": None, "embauche_apres": None})
+    return out
+
+# ----------------------------------------------------------------- Employee
 @app.route("/api/employee/<matricule>")
+@login_required
 def api_employee(matricule: str):
     mat = _norm_mat(matricule).upper()
     e = get_db().employees.find_one({"$or": [{"mat_wkd": mat}, {"mat_paie": mat}]})
     if not e:
-        return jsonify({"ok": False, "error":
-            f"Matricule « {matricule} » introuvable. L'extraction ACTIF est peut-être "
-            f"vide — un administrateur doit la recharger."}), 404
+        return jsonify({"ok": False, "error": f"Matricule « {matricule} » introuvable "
+                        "dans l'extraction ACTIF."}), 404
     e.pop("_id", None)
     return jsonify({"ok": True, "data": e})
 
-@app.route("/api/calculate", methods=["POST"])
+# ---------------------------------------------------------------- Calculate
+@app.post("/api/calculate")
+@login_required
 def api_calculate():
     p = request.get_json(silent=True) or {}
+    profils, regles = get_payplan()
+
     hire_raw = str(p.get("hire_date") or "").strip()
     site = str(p.get("site") or "").strip().upper()
     profiles = p.get("profiles") or []
@@ -116,39 +258,53 @@ def api_calculate():
     if not site:
         return jsonify({"ok": False, "error": "Le site est obligatoire."}), 400
     if (not isinstance(profiles, list) or len(profiles) != 3
-            or any(x not in PROFILE_POINTS for x in profiles)):
+            or any(x not in profils for x in profiles)):
         return jsonify({"ok": False, "error": "3 profils attendus parmi : "
-                        + ", ".join(PROFILE_POINTS) + "."}), 400
+                        + ", ".join(profils) + "."}), 400
     try:
         reference_date = date.fromisoformat(ref_raw) if ref_raw else date.today()
     except ValueError:
         return jsonify({"ok": False, "error": "Date de référence invalide."}), 400
 
-    result = calculate_prime(hire_date, site, profiles, reference_date)
+    result = calculate_prime(hire_date, site, profiles, reference_date,
+                             profile_points=profils, rules=regles)
 
-    # ---- Historisation de la simulation (bonus : traçabilité)
+    u = current_user()
     matricule = str(p.get("matricule") or "").strip()
-    emp = (get_db().employees.find_one({"mat_wkd": _norm_mat(matricule).upper()},
-                                       {"nom": 1}) if matricule else None)
+    emp = (get_db().employees.find_one({"mat_wkd": _norm_mat(matricule).upper()}, {"nom": 1})
+           if matricule else None)
     record = dict(result, matricule=matricule, site=site, profiles=profiles,
-                  nom=emp.get("nom") if emp else None,
-                  created_at=datetime.now(timezone.utc))
+                  nom=(emp or {}).get("nom"), sid=u["sid"], role=u["role"],
+                  created_at=now_utc())
     try:
         get_db().simulations.insert_one(record)
     except Exception:
-        pass  # le calcul doit aboutir même si l'historique échoue
-
+        pass
     return jsonify({"ok": True, "data": result})
 
+# ------------------------------------------------------------- Simulations
+@app.get("/api/simulations")
+@login_required
+def api_simulations():
+    u = current_user()
+    scope = request.args.get("scope", "mine")
+    try:
+        limit = min(int(request.args.get("limit", 20)), 200)
+    except ValueError:
+        limit = 20
+    q = {} if (u["role"] == "admin" and scope == "all") else {"sid": u["sid"]}
+    cur = get_db().simulations.find(q, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return jsonify({"ok": True, "data": list(cur)})
+
+# ------------------------------------------------------------------- Upload
 @app.route("/api/upload", methods=["POST"])
+@admin_required
 def api_upload():
-    if not admin_ok(request):
-        return jsonify({"ok": False, "error": "Token administrateur requis."}), 401
     file = request.files.get("file")
     if file is None or file.filename == "":
         return jsonify({"ok": False, "error": "Aucun fichier reçu."}), 400
     if not file.filename.lower().endswith((".xlsx", ".xls")):
-        return jsonify({"ok": False, "error": "Format attendu : Excel."}), 400
+        return jsonify({"ok": False, "error": "Format attendu : Excel (.xlsx/.xls)."}), 400
     try:
         df = pd.read_excel(file, sheet_name=0)
     except Exception as exc:
@@ -160,7 +316,6 @@ def api_upload():
         return jsonify({"ok": False, "error": "Colonnes manquantes : "
                         + ", ".join(sorted(required - set(df.columns)))}), 400
 
-    # ⚠️ On ne stocke QUE les champs nécessaires — pas d'adresse/téléphone (RGPD-like)
     docs = []
     for _, r in df.iterrows():
         mat = _norm_mat(r.get("Employee ID"))
@@ -174,11 +329,8 @@ def api_upload():
             "mat_paie": (_norm_mat(r.get("Previous Payroll ID")).upper()
                          if "Previous Payroll ID" in df.columns else ""),
             "nom": f"{_clean(r.get('First Name'))} {_clean(r.get('Last Name'))}".strip(),
-            "poste": poste,
-            "typo": derive_typo(poste),
-            "location": location,
-            "site": derive_site(location),
-            "projet": _clean(r.get("Activity ID")),
+            "poste": poste, "typo": derive_typo(poste), "location": location,
+            "site": derive_site(location), "projet": _clean(r.get("Activity ID")),
             "msa": _clean(r.get("MSA")) if "MSA" in df.columns else "",
             "statut_wkd": "ACTIVE",
             "hire_date": hire.isoformat() if hire else None,
@@ -186,21 +338,33 @@ def api_upload():
 
     db = get_db()
     db.employees.delete_many({})
-    db.employees.insert_many(docs)
+    if docs:
+        db.employees.insert_many(docs)
+    db.meta.replace_one({"_id": "actif"},
+                        {"_id": "actif", "count": len(docs), "updated_at": now_utc()},
+                        upsert=True)
     return jsonify({"ok": True,
                     "message": f"Extraction ACTIF enregistrée : {len(docs)} collaborateurs."})
 
-@app.route("/api/simulations")
-def api_simulations():
-    """Historique des simulations (protégé par token admin)."""
-    if not admin_ok(request):
-        return jsonify({"ok": False, "error": "Token administrateur requis."}), 401
+# -------------------------------------------------------------------- Stats
+@app.get("/api/stats")
+@admin_required
+def api_stats():
+    db = get_db()
     try:
-        limit = min(int(request.args.get("limit", 20)), 100)
-    except ValueError:
-        limit = 20
-    cur = get_db().simulations.find({}, {"_id": 0}).sort("created_at", -1).limit(limit)
-    return jsonify({"ok": True, "data": list(cur)})
+        db.command("ping")
+        db_status = "connected"
+    except Exception:
+        db_status = "error"
+    meta = db.meta.find_one({"_id": "actif"}) or {}
+    pp = db.payplan.find_one({"_id": "active"}) or {}
+    return jsonify({"ok": True, "data": {
+        "employees": db.employees.count_documents({}),
+        "simulations": db.simulations.count_documents({}),
+        "db": db_status,
+        "actif_updated_at": meta.get("updated_at"),
+        "payplan_updated_at": pp.get("updated_at"),
+    }})
 
 if __name__ == "__main__":
     app.run(debug=True)
