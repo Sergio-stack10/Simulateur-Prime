@@ -7,6 +7,7 @@ from pymongo import MongoClient
 
 from payplan_config import PROFILE_POINTS as DEFAULT_PROFILE_POINTS
 from payplan_config import PAYPLAN_RULES as DEFAULT_RULES
+from payplan_config import REF_MSA_SEED
 
 _client = None
 _db = None
@@ -73,3 +74,23 @@ def save_payplan(profils, regles):
 def reset_payplan():
     """Supprime le payplan BDD → re-seed depuis payplan_config.py au prochain accès."""
     get_db().payplan.delete_one({"_id": "active"})
+
+def get_ref_msa():
+    """Référentiel ID activité → MSA depuis la BDD ; seed au 1er accès."""
+    db = get_db()
+    doc = db.ref_msa.find_one({"_id": "active"})
+    if not doc:
+        doc = {"_id": "active",
+               "rows": [{"id": a, "msa": m, "libelle": ""} for a, m in REF_MSA_SEED],
+               "updated_at": datetime.now(timezone.utc)}
+        db.ref_msa.replace_one({"_id": "active"}, doc, upsert=True)
+    return doc.get("rows") or []
+
+def save_ref_msa(rows):
+    db = get_db()
+    db.ref_msa.replace_one({"_id": "active"},
+                           {"_id": "active", "rows": rows,
+                            "updated_at": datetime.now(timezone.utc)}, upsert=True)
+
+def reset_ref_msa():
+    get_db().ref_msa.delete_one({"_id": "active"})
