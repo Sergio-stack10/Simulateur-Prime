@@ -144,10 +144,12 @@ PAYPLAN_RULES = [
 
 
 # =========================================================================
-# LOGIQUE DE CALCUL (ne pas modifier)
+# LOGIQUE DE CALCUL (paramétrable — appelée avec le payplan de la BDD)
 # =========================================================================
+import calendar
+from datetime import date
+
 def months_between(start: date, end: date) -> int:
-    """Nombre de mois COMPLETS entre deux dates."""
     if end < start:
         return 0
     months = (end.year - start.year) * 12 + (end.month - start.month)
@@ -155,55 +157,50 @@ def months_between(start: date, end: date) -> int:
         months -= 1
     return max(0, months)
 
-
 def anciennete_decimale(start: date, end: date) -> float:
-    """Ancienneté affichée avec 1 décimale (ex. 60.3 mois)."""
     if end < start:
         return 0.0
     base = (end.year - start.year) * 12 + (end.month - start.month)
     dim = calendar.monthrange(end.year, end.month)[1]
     return round(max(0.0, base + (end.day - start.day) / dim), 1)
 
-
-def somme_points_profils(profiles, nb_mois):
-    """Additionne les points des N DERNIERS mois (M3 = plus récent).
-    Retourne (total, détail) avec les mois non comptés marqués."""
+def somme_points_profils(profiles, nb_mois, profile_points):
     labels = ["M1", "M2", "M3"]
     retenus = profiles if nb_mois >= len(profiles) else profiles[-nb_mois:]
     offset = len(profiles) - len(retenus)
     total, detail = 0, []
-    for j in range(offset):                      # mois non comptés (ex. M1)
+    for j in range(offset):
         detail.append({"mois": labels[j], "profil": profiles[j],
-                       "points": PROFILE_POINTS.get(profiles[j], 0),
+                       "points": profile_points.get(profiles[j], 0),
                        "pris_en_compte": False})
-    for i, p in enumerate(retenus):              # mois comptés
-        pts = PROFILE_POINTS.get(p, 0)
+    for i, p in enumerate(retenus):
+        pts = profile_points.get(p, 0)
         total += pts
         detail.append({"mois": labels[offset + i], "profil": p,
                        "points": pts, "pris_en_compte": True})
     return total, detail
 
-
-def trouver_regle(site: str, anciennete_mois: int, hire_date: date):
-    """Retourne la première règle du payplan applicable."""
-    for regle in PAYPLAN_RULES:
-        if site.upper() not in [s.upper() for s in regle["sites"]]:
+def trouver_regle(regles, site, anciennete_mois, hire_date):
+    for regle in regles:
+        if site.upper() not in [s.upper() for s in regle.get("sites", [])]:
             continue
-        if anciennete_mois < regle["anciennete_min"]:
+        if anciennete_mois < regle.get("anciennete_min", 0):
             continue
-        if regle["anciennete_max"] is not None and anciennete_mois > regle["anciennete_max"]:
+        amax = regle.get("anciennete_max")
+        if amax is not None and anciennete_mois > amax:
             continue
         avant, apres = regle.get("embauche_avant"), regle.get("embauche_apres")
-        if avant and hire_date >= date.fromisoformat(avant):
+        if avant and hire_date >= date.fromisoformat(str(avant)[:10]):
             continue
-        if apres and hire_date <= date.fromisoformat(apres):
+        if apres and hire_date <= date.fromisoformat(str(apres)[:10]):
             continue
         return regle
     return None
 
-
-def calculate_prime(hire_date, site, profiles, reference_date=None):
-    """Calcul complet : éligibilité, règle applicable, points, montant."""
+def calculate_prime(hire_date, site, profiles, reference_date=None,
+                    profile_points=None, rules=None):
+    profile_points = profile_points if profile_points is not None else PROFILE_POINTS
+    rules = rules if rules is not None else PAYPLAN_RULES
     reference_date = reference_date or date.today()
     anciennete = months_between(hire_date, reference_date)
 
@@ -216,36 +213,28 @@ def calculate_prime(hire_date, site, profiles, reference_date=None):
         "regle": None, "nb_mois_profil": None,
         "explication": "", "detail_points": [],
     }
-
     if anciennete < MIN_ANCIENNETE_MOIS:
         resultat["explication"] = (f"Non éligible : ancienneté de {anciennete} mois — "
                                    f"minimum requis : {MIN_ANCIENNETE_MOIS} mois.")
         return resultat
 
-    regle = trouver_regle(site, anciennete, hire_date)
+    regle = trouver_regle(rules, site, anciennete, hire_date)
     if regle is None:
         resultat["explication"] = (f"Aucune règle du payplan ne correspond "
-                                   f"(site {site}, ancienneté {anciennete} mois). "
-                                   f"Vérifiez payplan_config.py.")
+                                   f"(site {site}, ancienneté {anciennete} mois).")
         return resultat
 
-    total_points, detail = somme_points_profils(profiles, regle["nb_mois_profil"])
+    total_points, detail = somme_points_profils(profiles, regle["nb_mois_profil"], profile_points)
     montants = {int(k): v for k, v in regle["montants"].items()}
     montant = montants.get(total_points)
 
-    resultat.update({
-        "regle": regle["nom"],
-        "nb_mois_profil": regle["nb_mois_profil"],
-        "detail_points": detail,
-        "total_points": total_points,
-        "explication": regle.get("explication", ""),
-    })
-
+    resultat.update({"regle": regle["nom"], "nb_mois_profil": regle["nb_mois_profil"],
+                     "detail_points": detail, "total_points": total_points,
+                     "explication": regle.get("explication", "")})
     if montant is None:
         resultat["explication"] += (f" | Aucun montant défini pour {total_points} "
                                     f"point(s) dans la règle « {regle['nom']} ».")
         return resultat
-
     resultat["eligible"] = True
     resultat["montant_prime"] = montant
     return resultat
