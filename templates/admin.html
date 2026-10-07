@@ -22,9 +22,13 @@
 </nav>
 
 <main class="app-main">
-  <section class="hero reveal"><h1>Panneau d'administration</h1>
-    <p>Gestion de l'extraction ACTIF, du payplan et de l'historique des simulations.</p></section>
 
+  <section class="hero reveal">
+    <h1>Panneau d'administration</h1>
+    <p>Gestion de l'extraction ACTIF, du payplan et de l'historique des simulations.</p>
+  </section>
+
+  <!-- ===== Stats ===== -->
   <section class="stats-grid reveal" style="--d:.06s">
     <div class="stat-card"><span class="stat-chip">👥</span>
       <div><span class="stat-value" id="stat-employees">0</span>
@@ -40,6 +44,7 @@
       <span class="stat-label">Dernier chargement ACTIF</span></div></div>
   </section>
 
+  <!-- ===== Upload ACTIF ===== -->
   <section class="card reveal" style="--d:.12s">
     <h2><span class="chip">⬆</span> Extraction ACTIF</h2>
     <div class="dropzone" id="dropzone">
@@ -53,13 +58,20 @@
     <p id="upload-status" class="muted small"></p>
   </section>
 
+  <!-- ===== Payplan ===== -->
   <section class="card reveal" style="--d:.18s">
     <h2><span class="chip">⚙</span> Payplan</h2>
+
     <h3 class="pp-subtitle">Points par profil</h3>
     <div id="pp-profiles" class="pp-rows"></div>
     <button id="pp-add-profil" class="btn btn-ghost btn-sm">+ Profil</button>
 
-    <h3 class="pp-subtitle">Règles (la première règle qui correspond s'applique)</h3>
+    <h3 class="pp-subtitle">Règles du payplan (matrice)</h3>
+    <p class="muted small">
+      Priorité d'application : 1) les règles avec <b>codes MSA</b> sont testées en premier,
+      2) puis toutes les règles par <b>index # croissant</b>.<br/>
+      Champs laissés vides (Sites, MSA, dates) = « tous les cas ».
+    </p>
     <div id="pp-rules"></div>
 
     <div class="pp-actions">
@@ -69,10 +81,11 @@
       <button id="pp-reset" class="btn btn-ghost">↻ Recharger</button>
       <button id="pp-save" class="btn btn-primary">💾 Enregistrer le payplan</button>
     </div>
-    <p class="muted small">Priorité : les règles avec codes MSA s'appliquent en premier, puis par
-       index croissant (#). Les modifications s'appliquent immédiatement aux calculs.</p>
+    <p class="muted small">Les modifications s'appliquent immédiatement aux calculs —
+       sans redéploiement.</p>
   </section>
 
+  <!-- ===== Historique ===== -->
   <section class="card reveal" style="--d:.24s">
     <h2><span class="chip">🗂</span> Historique des simulations
       <span class="muted small" id="sims-count" style="margin-left:auto"></span></h2>
@@ -83,12 +96,15 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th>Date</th><th>Matricule</th><th>Nom</th><th>Site</th>
-          <th>Profils</th><th>Points</th><th>Prime</th><th>Statut</th></tr></thead>
+        <thead>
+          <tr><th>Date</th><th>Matricule</th><th>Nom</th><th>Site</th>
+              <th>Activités (points)</th><th>Prime</th><th>Statut</th></tr>
+        </thead>
         <tbody id="admin-sims-body"></tbody>
       </table>
     </div>
   </section>
+
 </main>
 
 <div id="toasts"></div>
