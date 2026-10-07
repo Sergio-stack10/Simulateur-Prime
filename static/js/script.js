@@ -1,227 +1,185 @@
-/* =========================================================================
-   Simulateur Prime de Régularité — logique front
-   ========================================================================= */
-const $ = (sel) => document.querySelector(sel);
-const fmtAr = new Intl.NumberFormat("fr-FR");
-const state = { employee: null, profils: {}, regles: [] };
+/* SimuPrime — page utilisateur */
+const $ = (s) => document.querySelector(s);
+const fmt = new Intl.NumberFormat("fr-FR");
+const PP = { profils: {}, regles: [] };
+let employee = null;
 
-function escapeHtml(str) {
-  return String(str ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+function esc(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-function alertBox(msg, type = "warn") {
-  return `<div class="alert ${type}">${escapeHtml(msg)}</div>`;
+
+async function api(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) { location.href = "/login"; throw new Error("401"); }
+  const ct = res.headers.get("content-type") || "";
+  const j = ct.includes("json") ? await res.json() : { ok: false, error: "Réponse invalide" };
+  if (res.status === 403) { toast(j.error || "Accès refusé", "error"); throw new Error("403"); }
+  return j;
+}
+
+function toast(msg, type = "info") {
+  const t = document.createElement("div");
+  t.className = "toast " + type; t.textContent = msg;
+  $("#toasts").appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; setTimeout(() => t.remove(), 300); }, 3800);
+}
+
+function countUp(el, target, { dur = 900, suffix = "" } = {}) {
+  const t0 = performance.now();
+  (function f(t) {
+    const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt.format(Math.round(target * e)) + suffix;
+    if (p < 1) requestAnimationFrame(f);
+  })(t0);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   $("#reference-date").value = new Date().toISOString().slice(0, 10);
-  bindEvents();
+  $("#btn-search").onclick = searchEmployee;
+  $("#matricule").addEventListener("keydown", (e) => { if (e.key === "Enter") searchEmployee(); });
+  $("#btn-calculate").onclick = calculate;
+  $("#btn-logout").onclick = logout;
+  $("#btn-refresh-sims").onclick = loadMySims;
   await loadPayplan();
+  await loadMySims();
 });
 
-function bindEvents() {
-  $("#btn-search").addEventListener("click", searchEmployee);
-  $("#matricule").addEventListener("keydown", (e) => { if (e.key === "Enter") searchEmployee(); });
-  $("#btn-calculate").addEventListener("click", calculate);
-  $("#btn-upload").addEventListener("click", uploadActif);
+async function logout() {
+  try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {}
+  location.href = "/login";
 }
 
-/* ------------------------------ Payplan ------------------------------ */
 async function loadPayplan() {
   try {
-    const res = await fetch("/api/payplan");
-    const json = await res.json();
-    if (!json.ok) return;
-    state.profils = json.profils;
-    state.regles = json.regles;
-    fillProfileSelects();
-    renderPayplanTable();
-  } catch (e) { console.error("Chargement du payplan impossible", e); }
+    const j = await api("/api/payplan");
+    if (!j.ok) return;
+    PP.profils = j.profils; PP.regles = j.regles;
+    const opts = Object.entries(j.profils)
+      .map(([l, p]) => `<option value="${esc(l)}">${esc(l)} · ${p} pt</option>`).join("");
+    document.querySelectorAll("select.profile").forEach((s) =>
+      s.innerHTML = `<option value="" disabled selected>Sélectionner…</option>${opts}`);
+  } catch (e) { console.error(e); }
 }
 
-function fillProfileSelects() {
-  const options = Object.entries(state.profils)
-    .map(([label, pts]) =>
-      `<option value="${escapeHtml(label)}">${escapeHtml(label)} — ${pts} pt</option>`)
-    .join("");
-  document.querySelectorAll("select.profile").forEach((sel) => {
-    sel.innerHTML = `<option value="" disabled selected>Sélectionner…</option>${options}`;
-  });
-}
-
-function renderPayplanTable() {
-  const rows = state.regles.map((r) => {
-    const bareme = Object.entries(r.montants)
-      .sort((a, b) => Number(a[0]) - Number(b[0]))
-      .map(([p, m]) => `<span class="bareme-item"><b>${p} pts</b> → ${fmtAr.format(m)} Ar</span>`)
-      .join("");
-    return `<tr>
-      <td>${escapeHtml(r.nom)}</td>
-      <td class="center">${r.nb_mois_profil}</td>
-      <td><div class="bareme">${bareme}</div></td>
-      <td class="muted">${escapeHtml(r.explication || "")}</td>
-    </tr>`;
-  }).join("");
-  $("#payplan-table").innerHTML = `
-    <table class="table">
-      <thead><tr><th>Règle</th><th>Mois comptés</th><th>Barème points → montant</th><th>Explication</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-}
-
-/* -------------------- Recherche collaborateur (ACTIF) ----------------- */
 async function searchEmployee() {
-  const mat = $("#matricule").value.trim();
-  const box = $("#employee-result");
-  if (!mat) { box.innerHTML = alertBox("Veuillez saisir un matricule WKD."); return; }
-  box.innerHTML = `<div class="loading">⏳ Recherche dans l'extraction ACTIF…</div>`;
+  const mat = $("#matricule").value.trim(), box = $("#employee-result");
+  if (!mat) { box.innerHTML = `<div class="alert warn">Veuillez saisir un matricule.</div>`; return; }
+  box.innerHTML = `<p class="muted">⏳ Recherche…</p>`;
   try {
-    const res = await fetch(`/api/employee/${encodeURIComponent(mat)}`);
-    const json = await res.json();
-    if (!json.ok) {
-      state.employee = null;
-      box.innerHTML = alertBox(json.error + " Vous pouvez saisir la date d'embauche et le site manuellement.");
-      return;
-    }
-    state.employee = json.data;
-    box.innerHTML = renderEmployee(json.data);
-    if (json.data.hire_date) $("#hire-date").value = json.data.hire_date;
-    if (json.data.site) $("#site").value = json.data.site;
-  } catch (e) {
-    box.innerHTML = alertBox("Erreur réseau — le serveur est-il démarré ?", "error");
-  }
+    const j = await api("/api/employee/" + encodeURIComponent(mat));
+    if (!j.ok) { employee = null;
+      box.innerHTML = `<div class="alert warn">${esc(j.error)}</div>`; return; }
+    employee = j.data;
+    box.innerHTML = renderEmployee(j.data);
+    if (j.data.hire_date) $("#hire-date").value = j.data.hire_date;
+    if (j.data.site) $("#site").value = j.data.site;
+  } catch (e) { box.innerHTML = `<div class="alert error">Erreur réseau.</div>`; }
 }
 
 function renderEmployee(e) {
   const info = (label, value) => `
     <div class="emp-item">
       <span class="emp-label">${label}</span>
-      <span class="emp-value">${escapeHtml(value || "—")}</span>
-    </div>`;
+      <span class="emp-value">${esc(value || "—")}</span></div>`;
   return `
     <div class="employee-card">
       <div class="emp-head">
-        <div><span class="emp-name">${escapeHtml(e.nom)}</span>
-             <span class="muted"> · ${escapeHtml(e.poste)}</span></div>
-        <span class="badge ok">${escapeHtml(e.statut_wkd)}</span>
+        <div><span class="emp-name">${esc(e.nom)}</span>
+             <span class="muted"> · ${esc(e.poste)}</span></div>
+        <span class="badge ok">${esc(e.statut_wkd)}</span>
       </div>
       <div class="emp-grid">
-        ${info("Matricule WKD", e.matricule)}
-        ${info("N° paie", e.matricule_paie)}
-        ${info("Typo", e.typo)}
-        ${info("Site (payplan)", e.site)}
-        ${info("Location", e.location)}
-        ${info("Projet", e.projet)}
-        ${info("MSA", e.msa)}
-        ${info("Date d'embauche", e.hire_date)}
+        ${info("Matricule WKD", e.matricule)}${info("N° paie", e.matricule_paie)}
+        ${info("Typo", e.typo)}${info("Site (payplan)", e.site)}
+        ${info("Location", e.location)}${info("Projet", e.projet)}
+        ${info("MSA", e.msa)}${info("Date d'embauche", e.hire_date)}
       </div>
     </div>`;
 }
 
-/* ------------------------------ Calcul ------------------------------- */
 async function calculate() {
   const profiles = [...document.querySelectorAll("select.profile")].map((s) => s.value);
-  const hireDate = $("#hire-date").value;
-  const site = $("#site").value;
+  const hireDate = $("#hire-date").value, site = $("#site").value;
   const referenceDate = $("#reference-date").value;
-
   const missing = [];
-  if (!hireDate) missing.push("la date d'embauche");
-  if (profiles.some((p) => !p)) missing.push("les 3 profils (M1, M2, M3)");
-  if (missing.length) { showResult(alertBox(`Champs manquants : ${missing.join(", ")}.`)); return; }
+  if (!hireDate) missing.push("date d'embauche");
+  if (profiles.some((p) => !p)) missing.push("les 3 profils");
+  if (missing.length) { toast("Champs manquants : " + missing.join(", "), "error"); return; }
 
-  const payload = {
-    matricule: state.employee ? state.employee.matricule : $("#matricule").value.trim(),
-    hire_date: hireDate,
-    site: site,
-    profiles: profiles,
-    reference_date: referenceDate || null,
-  };
-
+  const btn = $("#btn-calculate");
+  btn.classList.add("loading"); btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Calcul…';
   try {
-    const res = await fetch("/api/calculate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json();
-    if (!json.ok) { showResult(alertBox(json.error, "error")); return; }
-    renderResult(json.data);
-  } catch (e) {
-    showResult(alertBox("Erreur réseau lors du calcul.", "error"));
-  }
-}
-
-function showResult(html) {
-  const card = $("#result-card");
-  card.hidden = false;
-  card.innerHTML = `<h2>3 · Résultat de la simulation</h2>${html}`;
-  card.scrollIntoView({ behavior: "smooth", block: "start" });
+    const j = await api("/api/calculate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        matricule: employee ? employee.matricule : $("#matricule").value.trim(),
+        hire_date: hireDate, site, profiles,
+        reference_date: referenceDate || null }) });
+    if (!j.ok) { toast(j.error, "error"); return; }
+    renderResult(j.data);
+    await loadMySims();
+  } catch (e) { toast("Erreur réseau.", "error"); }
+  finally { btn.classList.remove("loading"); btn.disabled = false;
+            btn.innerHTML = "✨ Calculer ma prime"; }
 }
 
 function renderResult(d) {
-  const hasDetail = Array.isArray(d.detail_points) && d.detail_points.length > 0;
-
-  const rows = d.detail_points.map((p) => `
+  const card = $("#result-card"); card.hidden = false;
+  const maxPts = Math.max(...Object.values(PP.profils), 1) * (d.nb_mois_profil || 3);
+  const pct = Math.min(100, Math.round(d.total_points / maxPts * 100));
+  const rows = (d.detail_points || []).map((p) => `
     <tr class="${p.pris_en_compte ? "" : "off"}">
-      <td>${p.mois}</td>
-      <td>${escapeHtml(p.profil)}</td>
-      <td class="center">${p.pris_en_compte ? p.points + " pt" : "non compté"}</td>
-    </tr>`).join("");
-
-  const detail = hasDetail ? `
-    <div class="detail-block">
-      <h3>Détail du calcul</h3>
-      <table class="table small">
-        <thead><tr><th>Mois</th><th>Profil</th><th>Points retenus</th></tr></thead>
-        <tbody>${rows}
-          <tr class="total"><td colspan="2">Total</td>
-              <td class="center">${d.total_points} pts</td></tr>
-        </tbody>
-      </table>
-      <p class="muted small-text">
-        Règle appliquée : <b>${escapeHtml(d.regle)}</b><br>
-        Ancienneté retenue : <b>${d.anciennete_mois} mois</b> (au ${d.date_reference})<br>
-        ${escapeHtml(d.explication || "")}
-      </p>
-    </div>` : "";
+      <td>${p.mois}</td><td>${esc(p.profil)}</td>
+      <td class="center">${p.pris_en_compte ? p.points + " pt" : "non compté"}</td></tr>`).join("");
+  const detail = `
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Mois</th><th>Profil</th><th>Points retenus</th></tr></thead>
+      <tbody>${rows}<tr class="total"><td colspan="2">Total</td>
+        <td class="center">${d.total_points} pts</td></tr></tbody></table></div>
+    <p class="muted small">Règle : <b>${esc(d.regle || "—")}</b> ·
+      Ancienneté retenue : <b>${d.anciennete_mois} mois</b> (au ${d.date_reference})<br/>
+      ${esc(d.explication || "")}</p>`;
 
   if (!d.eligible) {
-    showResult(alertBox(d.explication || "Non éligible.") + detail);
-    return;
+    card.innerHTML = `<h2><span class="chip">3</span> Résultat</h2>
+      <div class="alert warn">${esc(d.explication || "Non éligible.")}</div>${detail}`;
+    card.scrollIntoView({ behavior: "smooth" }); return;
   }
-
-  showResult(`
+  card.innerHTML = `
+    <h2><span class="chip">3</span> Résultat de la simulation</h2>
     <div class="results">
       <div class="result-box">
         <span class="result-label">Cumul de points</span>
-        <span class="result-value">${d.total_points}<small> pts</small></span>
-        <span class="result-sub">sur les ${d.nb_mois_profil} derniers mois</span>
+        <span class="result-value" id="rv-points">0</span>
+        <div class="gauge"><div class="gauge-fill" id="gauge"></div></div>
+        <span class="result-sub">sur ${d.nb_mois_profil} mois · max ${maxPts} pts</span>
       </div>
       <div class="result-box highlight">
         <span class="result-label">Prime estimée</span>
-        <span class="result-value">${fmtAr.format(d.montant_prime)}<small> Ar</small></span>
+        <span class="result-value gold" id="rv-amount">0</span>
         <span class="result-sub">Ancienneté : ${d.anciennete_affichee} mois</span>
       </div>
-    </div>
-    ${detail}`);
+    </div>${detail}`;
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+  requestAnimationFrame(() => {
+    countUp($("#rv-points"), d.total_points, { suffix: " pts" });
+    countUp($("#rv-amount"), d.montant_prime, { suffix: " Ar" });
+    $("#gauge").style.width = pct + "%";
+  });
 }
 
-/* --------------------------- Upload ACTIF ---------------------------- */
-async function uploadActif() {
-  const input = $("#file-actif");
-  const status = $("#upload-status");
-  if (!input.files.length) { status.textContent = "Choisissez d'abord un fichier .xlsx"; return; }
-  // Token admin (requis une fois l'outil déployé publiquement)
-  const token = prompt("Token administrateur :") || "";
-  const fd = new FormData();
-  fd.append("file", input.files[0]);
-  fd.append("admin_token", token);
-  status.textContent = "⏳ Chargement…";
+async function loadMySims() {
   try {
-    const res = await fetch("/api/upload", { method: "POST", body: fd });
-    const json = await res.json();
-    status.textContent = json.ok ? "✅ " + json.message : "❌ " + json.error;
-  } catch (e) { status.textContent = "❌ Erreur réseau"; }
+    const j = await api("/api/simulations?scope=mine&limit=10");
+    const rows = (j.data || []).map((r) => `
+      <tr><td>${new Date(r.created_at).toLocaleString("fr-FR")}</td>
+      <td>${esc(r.matricule || "—")}</td><td>${esc(r.site || "")}</td>
+      <td>${(r.profiles || []).map(esc).join(" / ")}</td>
+      <td class="center"><b>${r.total_points}</b></td>
+      <td>${r.montant_prime != null ? fmt.format(r.montant_prime) + " Ar" : "—"}</td></tr>`).join("");
+    $("#my-sims-body").innerHTML = rows ||
+      `<tr><td colspan="6" class="muted center">Aucune simulation pour le moment.</td></tr>`;
+  } catch (e) {}
 }
