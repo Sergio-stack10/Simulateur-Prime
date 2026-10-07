@@ -16,6 +16,8 @@ from flask import Flask, jsonify, redirect, render_template, request, session
 
 from db import get_db, get_payplan, save_payplan, reset_payplan
 from payplan_config import calculate_prime
+from db import (get_db, get_payplan, save_payplan, reset_payplan,
+                get_ref_msa, save_ref_msa, reset_ref_msa)
 
 load_dotenv()
 
@@ -53,6 +55,11 @@ def derive_site(location: str) -> str:
 
 def derive_typo(title: str) -> str:
     return "TECH" if TECH_PATTERN.search(title or "") else "OPS"
+
+def extract_activity_code(activity_full: str) -> str:
+    """'W0ZQPJ Orange At Hd - Antananarivo' -> 'W0ZQPJ'."""
+    s = str(activity_full or "").strip()
+    return s.split()[0].upper() if s else ""
 
 def extract_msa_code(msa_full: str) -> str:
     """'16152 - Orange - WHFR1006' -> 'WHFR1006'."""
@@ -268,13 +275,42 @@ def api_employee(matricule: str):
                         "dans l'extraction ACTIF."}), 404
     e.pop("_id", None)
     e.setdefault("msa_code", extract_msa_code(e.get("msa")))
+    e.setdefault("projet_code", extract_activity_code(e.get("projet")))
     return jsonify({"ok": True, "data": e})
 
-@app.get("/api/msas")
+@app.get("/api/ref-msa")
 @login_required
-def api_msas():
-    codes = get_db().employees.distinct("msa_code")
-    return jsonify({"ok": True, "data": sorted(c for c in codes if c)})
+def api_ref_msa_get():
+    return jsonify({"ok": True, "data": get_ref_msa()})
+
+@app.put("/api/ref-msa")
+@admin_required
+def api_ref_msa_put():
+    d = request.get_json(silent=True) or {}
+    rows = d.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"ok": False, "error": "Au moins une ligne requise."}), 400
+    clean, seen = [], set()
+    for i, r in enumerate(rows, 1):
+        aid = str(r.get("id") or "").strip().upper()
+        msa = str(r.get("msa") or "").strip().upper()
+        lib = str(r.get("libelle") or "").strip()
+        if not aid or not msa:
+            return jsonify({"ok": False, "error": f"Ligne {i} : ID activité et MSA requis."}), 400
+        if aid in seen:
+            return jsonify({"ok": False, "error": f"Ligne {i} : ID « {aid} » en double."}), 400
+        seen.add(aid)
+        clean.append({"id": aid, "msa": msa, "libelle": lib})
+    save_ref_msa(clean)
+    return jsonify({"ok": True, "message": f"Référentiel enregistré : {len(clean)} lignes.",
+                    "data": clean})
+
+@app.post("/api/ref-msa/reset")
+@admin_required
+def api_ref_msa_reset():
+    reset_ref_msa()
+    return jsonify({"ok": True, "message": "Référentiel réinitialisé.",
+                    "data": get_ref_msa()})
 
 # ---------------------------------------------------------------- Calculate
 @app.post("/api/calculate")
@@ -302,22 +338,28 @@ def api_calculate():
     except ValueError:
         return jsonify({"ok": False, "error": "Date de référence invalide."}), 400
 
+    ref_msa = {r["id"]: r["msa"] for r in get_ref_msa()}
     clean = []
     for i, a in enumerate(activites, 1):
-        msa = str(a.get("msa") or "").strip().upper()
+        activity_id = str(a.get("activity_id") or "").strip().upper()
         profiles = a.get("profiles") or []
         try:
             heures = float(a.get("heures") or 0)
         except (TypeError, ValueError):
             heures = 0.0
-        if not msa:
-            return jsonify({"ok": False, "error": f"Activité {i} : code MSA manquant."}), 400
+        if not activity_id:
+            return jsonify({"ok": False, "error": f"Activité {i} : ID d'activité manquant."}), 400
         if heures <= 0:
             return jsonify({"ok": False, "error": f"Activité {i} : heures > 0 requises."}), 400
         if len(profiles) != 3 or any(x not in profils for x in profiles):
             return jsonify({"ok": False, "error": f"Activité {i} : 3 profils attendus parmi : "
                             + ", ".join(profils) + "."}), 400
-        clean.append({"msa": msa, "heures": heures, "profiles": profiles})
+        msa = ref_msa.get(activity_id)
+        if not msa:
+            return jsonify({"ok": False, "error": f"Activité {i} : ID « {activity_id} » absent "
+                            "du référentiel (voir panneau Admin)."}), 400
+        clean.append({"activity_id": activity_id, "msa": msa,
+                      "heures": heures, "profiles": profiles})
 
     result = calculate_prime(hire_date, site, clean, reference_date, profils, regles)
 
@@ -386,6 +428,7 @@ def api_upload():
             "statut_wkd": "ACTIVE",
             "hire_date": hire.isoformat() if hire else None,
             "msa_code": extract_msa_code(_clean(r.get("MSA")) if "MSA" in df.columns else ""),
+            "projet_code": extract_activity_code(_clean(r.get("Activity ID"))),
         })
 
     db = get_db()
