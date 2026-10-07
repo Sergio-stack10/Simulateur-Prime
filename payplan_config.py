@@ -20,7 +20,7 @@
 =====================================================================
 """
 
-PROFILE_POINTS = {"Leader": 3, "Fragile": 1, "Soutien Intense": 0, "Non évalué": None}
+PROFILE_POINTS = {"L": 3, "F": 1, "SI": 0, "Non évalué": None}
 MIN_ANCIENNETE_MOIS = 4
 
 PAYPLAN_RULES = [
