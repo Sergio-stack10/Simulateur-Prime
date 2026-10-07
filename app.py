@@ -64,7 +64,9 @@ def admin_ok(request) -> bool:
     """Protège les routes sensibles si ADMIN_TOKEN est configuré."""
     if not ADMIN_TOKEN:
         return True  # mode dev local
-    token = request.headers.get("X-Admin-Token", "") or request.args.get("token", "")
+    token = (request.headers.get("X-Admin-Token", "")
+             or request.args.get("token", "")
+             or request.form.get("admin_token", ""))
     return token == ADMIN_TOKEN
 
 # ------------------------------------------------------------- Routes
