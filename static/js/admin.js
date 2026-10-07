@@ -69,7 +69,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("#btn-export-csv").onclick = () => exportCSV(allSims);
   $("#sims-search").oninput = renderSims;
 
-  await Promise.all([loadStats(), loadPayplan(), loadSims()]);
+  $("#ref-add").onclick = () => $("#ref-body").appendChild(refRow("", "", ""));
+  $("#ref-reset").onclick = resetRef;
+  $("#ref-save").onclick = saveRef;
+
+  await Promise.all([loadStats(), loadPayplan(), loadRef(), loadSims()]);
 });
 
 /* ---------------- Session ---------------- */
@@ -273,7 +277,7 @@ function renderSims() {
     [r.matricule, r.nom, r.site].some((v) => String(v ?? "").toLowerCase().includes(q)));
   $("#admin-sims-body").innerHTML = rows.map((r) => {
     const acts = r.activites
-      ? r.activites.map((a) => a.msa).join(", ")
+      ? r.activites.map((a) => a.activity_id || a.msa).join(", ")
       : (r.profiles || []).join(" / ");
     const pts = r.activites
       ? r.activites.map((a) => a.total_points).join("/")
@@ -298,7 +302,7 @@ function exportCSV(rows) {
                 "Activites (MSA)", "Points", "Eligible", "Montant (Ar)"];
   const lines = rows.map((r) => {
     const acts = r.activites
-      ? r.activites.map((a) => a.msa).join(", ")
+      ? r.activites.map((a) => a.activity_id || a.msa).join(", ")
       : (r.profiles || []).join("/");
     const pts = r.activites
       ? r.activites.map((a) => a.total_points).join("/")
@@ -318,4 +322,52 @@ function exportCSV(rows) {
   a.download = "simulations.csv";
   a.click();
   toast("Export CSV téléchargé.", "success");
+
+/* ---------------- Référentiel Activités ↔ MSA ---------------- */
+async function loadRef() {
+  try {
+    const j = await api("/api/ref-msa");
+    if (!j.ok) return;
+    const tb = $("#ref-body"); tb.innerHTML = "";
+    (j.data || []).forEach((r) => tb.appendChild(refRow(r.id, r.msa, r.libelle)));
+    $("#ref-count").textContent = (j.data || []).length + " ligne(s)";
+  } catch (e) { toast("Impossible de charger le référentiel.", "error"); }
+}
+
+function refRow(id, msa, lib) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input class="rf-id" placeholder="ex : W0ZQPJ" value="${esc(id)}"/></td>
+    <td><input class="rf-msa" placeholder="ex : WHFR1006" value="${esc(msa)}"/></td>
+    <td><input class="rf-lib" placeholder="ex : Orange At Hd" value="${esc(lib)}"/></td>
+    <td><button class="btn btn-danger btn-sm" title="Supprimer">✕</button></td>`;
+  tr.querySelector("button").onclick = () => tr.remove();
+  return tr;
+}
+
+async function saveRef() {
+  const rows = [...document.querySelectorAll("#ref-body tr")].map((tr) => ({
+    id: tr.querySelector(".rf-id").value,
+    msa: tr.querySelector(".rf-msa").value,
+    libelle: tr.querySelector(".rf-lib").value
+  }));
+  const btn = $("#ref-save"); btn.disabled = true; btn.textContent = "⏳…";
+  try {
+    const j = await api("/api/ref-msa", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows }) });
+    if (j.ok) { toast("✅ " + j.message, "success"); await loadRef(); }
+    else toast(j.error, "error");
+  } catch (e) { toast("Erreur réseau.", "error"); }
+  finally { btn.disabled = false; btn.textContent = "💾 Enregistrer"; }
+}
+
+async function resetRef() {
+  if (!confirm("Remplacer le référentiel par les valeurs du fichier payplan_config.py ?")) return;
+  try {
+    const j = await api("/api/ref-msa/reset", { method: "POST" });
+    if (j.ok) { toast("✅ " + j.message, "success"); await loadRef(); }
+    else toast(j.error, "error");
+  } catch (e) { toast("Erreur réseau.", "error"); }
+}
 }
