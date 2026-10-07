@@ -213,10 +213,16 @@ def _validate_profils(p):
         k = str(k).strip()
         if not k:
             raise ValueError("Nom de profil vide.")
-        v = int(v)
-        if not 0 <= v <= 20:
-            raise ValueError(f"Points invalides pour « {k} » (0 à 20).")
-        out[k] = v
+        if v in (None, "", "null", "None"):
+            out[k] = None          # « vide » (ex : Non évalué)
+        else:
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                raise ValueError(f"Points invalides pour « {k} ».")
+            if not 0 <= v <= 20:
+                raise ValueError(f"Points invalides pour « {k} » (0 à 20).")
+            out[k] = v
     return out
 
 def _val_date(v):
