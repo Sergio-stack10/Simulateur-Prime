@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Connexion MongoDB + helpers payplan (v2)."""
+"""Connexion MongoDB + helpers payplan (v3)."""
 import os
 from datetime import datetime, timezone
 
@@ -50,6 +50,25 @@ def _rules_from_db(rules):
         r["montants"] = {int(k): int(v) for k, v in (r.get("montants") or {}).items()}
         out.append(r)
     return out
+
+def get_payplan():
+    """Payplan actif depuis la BDD ; seed depuis payplan_config.py au 1er accès."""
+    db = get_db()
+    doc = db.payplan.find_one({"_id": "active"})
+    if not doc:
+        doc = {"_id": "active", "profils": dict(DEFAULT_PROFILE_POINTS),
+               "regles": _rules_to_db(DEFAULT_RULES),
+               "updated_at": datetime.now(timezone.utc)}
+        db.payplan.replace_one({"_id": "active"}, doc, upsert=True)
+    return dict(doc.get("profils") or {}), _rules_from_db(doc.get("regles"))
+
+def save_payplan(profils, regles):
+    db = get_db()
+    db.payplan.replace_one(
+        {"_id": "active"},
+        {"_id": "active", "profils": profils, "regles": _rules_to_db(regles),
+         "updated_at": datetime.now(timezone.utc)},
+        upsert=True)
 
 def reset_payplan():
     """Supprime le payplan BDD → re-seed depuis payplan_config.py au prochain accès."""
