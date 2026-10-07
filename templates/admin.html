@@ -58,6 +58,28 @@
     <p id="upload-status" class="muted small"></p>
   </section>
 
+  <!-- ===== Référentiel Activités ↔ MSA ===== -->
+  <section class="card reveal" style="--d:.15s">
+    <h2><span class="chip">🔗</span> Référentiel Activités ↔ MSA</h2>
+    <p class="muted small">Chaque ID d'activité saisi dans le simulateur affiche
+       automatiquement le MSA du projet selon ce tableau. Modifiable librement :
+       ajouter, modifier ou supprimer des lignes.</p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th style="width:150px">ID activité</th><th style="width:150px">MSA</th>
+          <th>Libellé (optionnel)</th><th style="width:50px"></th></tr></thead>
+        <tbody id="ref-body"></tbody>
+      </table>
+    </div>
+    <div class="pp-actions">
+      <button id="ref-add" class="btn btn-ghost">+ Ligne</button>
+      <span style="flex:1"></span>
+      <span class="muted small" id="ref-count"></span>
+      <button id="ref-reset" class="btn btn-ghost">⟲ Réinitialiser</button>
+      <button id="ref-save" class="btn btn-primary">💾 Enregistrer</button>
+    </div>
+  </section>
+
   <!-- ===== Payplan ===== -->
   <section class="card reveal" style="--d:.18s">
     <h2><span class="chip">⚙</span> Payplan</h2>
