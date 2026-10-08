@@ -25,11 +25,11 @@
 
   <section class="hero reveal">
     <h1>Panneau d'administration</h1>
-    <p>Gestion de l'extraction ACTIF, du payplan et de l'historique des simulations.</p>
+    <p>Gestion de l'extraction ACTIF, du référentiel, du payplan et de l'historique.</p>
   </section>
 
   <!-- ===== Stats ===== -->
-  <section class="stats-grid reveal" style="--d:.06s">
+  <section class="stats-grid reveal" style="--d:.04s">
     <div class="stat-card"><span class="stat-chip">👥</span>
       <div><span class="stat-value" id="stat-employees">0</span>
       <span class="stat-label">Collaborateurs ACTIF</span></div></div>
@@ -44,8 +44,8 @@
       <span class="stat-label">Dernier chargement ACTIF</span></div></div>
   </section>
 
-  <!-- ===== Upload ACTIF ===== -->
-  <section class="card reveal" style="--d:.12s">
+  <!-- ===== ACTIF ===== -->
+  <section class="card reveal" style="--d:.08s">
     <h2><span class="chip">⬆</span> Extraction ACTIF</h2>
     <div class="dropzone" id="dropzone">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -58,12 +58,11 @@
     <p id="upload-status" class="muted small"></p>
   </section>
 
-  <!-- ===== Référentiel Activités ↔ MSA ===== -->
-  <section class="card reveal" style="--d:.15s">
-    <h2><span class="chip">🔗</span> Référentiel Activités ↔ MSA</h2>
+  <!-- ===== Référentiel ===== -->
+  <section class="card reveal" style="--d:.12s">
+    <h2><span class="chip">🔗</span> Référentiel Activités ↔ CPSA</h2>
     <p class="muted small">Chaque ID d'activité saisi dans le simulateur affiche
-       automatiquement le MSA du projet selon ce tableau. Modifiable librement :
-       ajouter, modifier ou supprimer des lignes.</p>
+       automatiquement le CPSA et le libellé du projet selon ce tableau.</p>
     <div class="ref-import">
       <input type="file" id="file-ref" accept=".xlsx,.xls" hidden/>
       <button id="ref-import-btn" class="btn btn-ghost btn-sm">📥 Importer l'Excel du référentiel</button>
@@ -71,8 +70,8 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th style="width:150px">ID activité</th><th style="width:150px">MSA</th>
-          <th>Libellé (optionnel)</th><th style="width:50px"></th></tr></thead>
+        <thead><tr><th style="width:140px">ID activité</th><th style="width:140px">CPSA</th>
+          <th>Libellé de l'activité</th><th style="width:50px"></th></tr></thead>
         <tbody id="ref-body"></tbody>
       </table>
     </div>
@@ -86,19 +85,15 @@
   </section>
 
   <!-- ===== Payplan ===== -->
-  <section class="card reveal" style="--d:.18s">
+  <section class="card reveal" style="--d:.16s">
     <h2><span class="chip">⚙</span> Payplan</h2>
-
-    <h3 class="pp-subtitle">Points par profil</h3>
+    <h3 class="pp-subtitle">Points par profil (champ vide = aucun point, ex : Non évalué)</h3>
     <div id="pp-profiles" class="pp-rows"></div>
     <button id="pp-add-profil" class="btn btn-ghost btn-sm">+ Profil</button>
 
     <h3 class="pp-subtitle">Règles du payplan (matrice)</h3>
-    <p class="muted small">
-      Priorité d'application : 1) les règles avec <b>codes MSA</b> sont testées en premier,
-      2) puis toutes les règles par <b>index # croissant</b>.<br/>
-      Champs laissés vides (Sites, MSA, dates) = « tous les cas ».
-    </p>
+    <p class="muted small">Priorité : 1) règles avec <b>codes CPSA</b> en premier,
+       2) puis index # croissant. Champs vides = « tous les cas ».</p>
     <div id="pp-rules"></div>
 
     <div class="pp-actions">
@@ -108,12 +103,10 @@
       <button id="pp-reset" class="btn btn-ghost">↻ Recharger</button>
       <button id="pp-save" class="btn btn-primary">💾 Enregistrer le payplan</button>
     </div>
-    <p class="muted small">Les modifications s'appliquent immédiatement aux calculs —
-       sans redéploiement.</p>
   </section>
 
   <!-- ===== Historique ===== -->
-  <section class="card reveal" style="--d:.24s">
+  <section class="card reveal" style="--d:.2s">
     <h2><span class="chip">🗂</span> Historique des simulations
       <span class="muted small" id="sims-count" style="margin-left:auto"></span></h2>
     <div class="sims-toolbar">
@@ -123,10 +116,8 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <thead>
-          <tr><th>Date</th><th>Matricule</th><th>Nom</th><th>Site</th>
-              <th>Activités (points)</th><th>Prime</th><th>Statut</th></tr>
-        </thead>
+        <thead><tr><th>Date</th><th>Matricule</th><th>Nom</th><th>Site</th>
+            <th>Activités (points)</th><th>Prime</th><th>Statut</th></tr></thead>
         <tbody id="admin-sims-body"></tbody>
       </table>
     </div>
