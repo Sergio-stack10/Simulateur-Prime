@@ -169,7 +169,7 @@ function addActivity(activityId = "") {
     else if (REF[v]) {
       box.hidden = false; box.classList.remove("unknown");
       box.querySelector(".txt").textContent =
-        "CPSA : " + REF[v].msa + (REF[v].libelle ? " · " + REF[v].libelle : "");
+        "MSA : " + REF[v].msa + (REF[v].libelle ? " · " + REF[v].libelle : "");
     } else {
       box.hidden = false; box.classList.add("unknown");
       box.querySelector(".txt").textContent = "ID inconnu — vérifiez le référentiel (Admin)";
@@ -318,7 +318,7 @@ function renderResult(d) {
   const conditions = (a) => {
     const i = a.regle_infos || {}, parts = [];
     if (i.sites && i.sites.length) parts.push("Site : " + i.sites.join(", "));
-    if (i.msa && i.msa.length) parts.push("CPSA : " + i.msa.join(", "));
+    if (i.msa && i.msa.length) parts.push("MSA : " + i.msa.join(", "));
     if (i.embauche_avant) parts.push("Embauche avant le " + i.embauche_avant);
     if (i.embauche_apres) parts.push("Embauche à partir du " + i.embauche_apres);
     parts.push(`Ancienneté : ${i.anciennete_min != null ? i.anciennete_min : "?"}` +
@@ -379,7 +379,7 @@ function renderResult(d) {
       </div>
     </div>
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Activité (ID → CPSA)</th><th>Heures</th><th>% base</th><th>Points</th>
+      <thead><tr><th>Activité (ID → MSA)</th><th>Heures</th><th>% base</th><th>Points</th>
         <th>Montant base</th><th>Montant proratisé</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <h3 class="pp-subtitle">Règles du payplan appliquées</h3>
