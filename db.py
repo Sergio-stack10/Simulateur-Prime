@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Connexion MongoDB + helpers (v10 — rechargement forcé du payplan)."""
+"""Connexion MongoDB + helpers (v11 — les saisies Admin ne sont plus jamais écrasées)."""
 import os
 from datetime import datetime, timezone
 
@@ -9,8 +9,7 @@ from payplan_config import PROFILE_POINTS as DEFAULT_PROFILE_POINTS
 from payplan_config import PAYPLAN_RULES as DEFAULT_RULES
 from payplan_config import REF_MSA_SEED
 
-PAYPLAN_VERSION = 10   # ⚠️ changez ce numéro pour forcer un rechargement du fichier
-REF_VERSION = 6        # ne pas toucher (conserve votre référentiel importé)
+REF_VERSION = 6   # ne pas toucher (conserve votre référentiel importé)
 
 _client = None
 _db = None
@@ -72,27 +71,26 @@ def _rules_from_db(rules):
     return out
 
 def get_payplan():
+    """Seed UNIQUEMENT si absent. Ensuite, seules les sauvegardes Admin
+    (éditeur ou import Excel) modifient le payplan — jamais automatiquement."""
     db = get_db()
     doc = db.payplan.find_one({"_id": "active"})
-    if doc and doc.get("version") == PAYPLAN_VERSION:
-        return dict(doc.get("profils") or {}), _rules_from_db(doc.get("regles"))
-    # Version différente ou absente → RECHARGEMENT COMPLET depuis le fichier.
-    # (Les montants saisis via Admin → 💾 restent ensuite enregistrés.)
-    db.payplan.replace_one(
-        {"_id": "active"},
-        {"_id": "active", "version": PAYPLAN_VERSION,
-         "profils": dict(DEFAULT_PROFILE_POINTS),
-         "regles": _rules_to_db(DEFAULT_RULES),
-         "updated_at": datetime.now(timezone.utc)},
-        upsert=True)
-    return dict(DEFAULT_PROFILE_POINTS), _rules_from_db(DEFAULT_RULES)
+    if not doc:
+        db.payplan.replace_one(
+            {"_id": "active"},
+            {"_id": "active",
+             "profils": dict(DEFAULT_PROFILE_POINTS),
+             "regles": _rules_to_db(DEFAULT_RULES),
+             "updated_at": datetime.now(timezone.utc)},
+            upsert=True)
+        return dict(DEFAULT_PROFILE_POINTS), _rules_from_db(DEFAULT_RULES)
+    return dict(doc.get("profils") or {}), _rules_from_db(doc.get("regles"))
 
 def save_payplan(profils, regles):
     db = get_db()
     db.payplan.replace_one(
         {"_id": "active"},
-        {"_id": "active", "version": PAYPLAN_VERSION,
-         "profils": profils, "regles": _rules_to_db(regles),
+        {"_id": "active", "profils": profils, "regles": _rules_to_db(regles),
          "updated_at": datetime.now(timezone.utc)},
         upsert=True)
 
