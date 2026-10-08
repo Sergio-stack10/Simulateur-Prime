@@ -180,7 +180,16 @@ def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_point
     montant = montants.get(total)
     res.update({"regle": regle["nom"], "nb_mois_profil": regle["nb_mois_profil"],
                 "detail_points": detail, "total_points": total,
-                "explication": regle.get("explication", "")})
+                "explication": regle.get("explication", ""),
+                "bareme": montants,
+                "regle_infos": {
+                    "sites": regle.get("sites") or [],
+                    "msa": regle.get("msa") or [],
+                    "embauche_avant": regle.get("embauche_avant"),
+                    "embauche_apres": regle.get("embauche_apres"),
+                    "anciennete_min": regle.get("anciennete_min", 0),
+                    "anciennete_max": regle.get("anciennete_max"),
+                }})
     if montant is None:
         res["explication"] += f" | Aucun montant pour {total} pt dans « {regle['nom']} »."
         return res
