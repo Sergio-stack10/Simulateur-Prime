@@ -74,6 +74,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("#ref-save").onclick = saveRef;
 
   await Promise.all([loadStats(), loadPayplan(), loadRef(), loadSims()]);
+
+    <div class="ref-import">
+      <input type="file" id="file-ref" accept=".xlsx,.xls" hidden/>
+      <button id="ref-import-btn" class="btn btn-ghost btn-sm">📥 Importer l'Excel du référentiel</button>
+      <span id="ref-import-status" class="muted small"></span>
+    </div>
 });
 
 /* ---------------- Session ---------------- */
@@ -374,5 +380,17 @@ async function resetRef() {
     if (j.ok) { toast("✅ " + j.message, "success"); await loadRef(); }
     else toast(j.error, "error");
   } catch (e) { toast("Erreur réseau.", "error"); }
+}
+
+async function uploadRef(file) {
+  if (!/\.(xlsx|xls)$/i.test(file.name)) { toast("Format attendu : .xlsx", "error"); return; }
+  $("#ref-import-status").textContent = "⏳ Import de " + file.name + "…";
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const j = await api("/api/ref-msa/upload", { method: "POST", body: fd });
+    if (j.ok) { toast("✅ " + j.message, "success");
+      $("#ref-import-status").textContent = "✅ " + j.message; await loadRef(); }
+    else { toast(j.error, "error"); $("#ref-import-status").textContent = "❌ " + j.error; }
+  } catch (e) { $("#ref-import-status").textContent = "❌ Erreur réseau"; }
 }
 }
