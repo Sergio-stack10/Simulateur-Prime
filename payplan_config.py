@@ -209,7 +209,7 @@ def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_point
            "eligible": False, "explication": "", "detail_points": [], "nb_mois_profil": None}
     regle = trouver_regle(rules, site, msa, anciennete, hire_date)
     if regle is None:
-        res["explication"] = (f"Aucune règle : Site={site} · CPSA={msa or '—'} · "
+        res["explication"] = (f"Aucune règle : Site={site} · MSA={msa or '—'} · "
                               f"embauche={hire_date.strftime('%d/%m/%Y')} · "
                               f"ancienneté={anciennete} mois. Complétez le payplan (Admin).")
         return res
