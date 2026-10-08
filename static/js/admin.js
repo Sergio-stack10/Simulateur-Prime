@@ -204,7 +204,7 @@ function ruleCard(r) {
     <div class="rule-grid">
       <div class="field"><label>Sites (vide = tous)</label>
         <input class="r-sites" placeholder="ANTA, TMM" value="${esc(sites)}"/></div>
-      <div class="field"><label>Codes CPSA (vide = tous)</label>
+      <div class="field"><label>Codes MSA (vide = tous)</label>
         <input class="r-msa" placeholder="WHFR1135, WHFR919" value="${esc(msa)}"/></div>
       <div class="field"><label>Embauche avant le</label>
         <input class="r-avant" type="date" value="${esc(r.embauche_avant || "")}"/></div>
