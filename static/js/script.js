@@ -283,9 +283,9 @@ function renderResult(d) {
   card.hidden = false;
   const acts = d.activites || [];
 
-  const baremeChips = (a) => Object.entries(a.bareme || {}).sort((x, y) => x[0] - y[0])
-    .map(([p, m]) => `<span class="bchip ${+p === a.total_points ? "hit" : ""}">
-       ${p} pt → ${fmt.format(m)} Ar</span>`).join("");
+  const baremeChips = (a) => (a.bareme || []).slice().sort((x, y) => x.min - y.min)
+    .map((p) => `<span class="bchip ${a.total_points >= p.min && a.total_points <= p.max ? "hit" : ""}">
+       ${p.min === p.max ? p.min + " pt" : p.min + "–" + p.max + " pts"} → ${fmt.format(p.montant)} Ar</span>`).join("");
 
   const conditions = (a) => {
     const i = a.regle_infos || {}, parts = [];
