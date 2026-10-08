@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SimuPrime — Simulateur de prime</title>
+  <title>Calculateur de prime de régularité</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
@@ -12,8 +12,7 @@
 <nav class="topbar">
   <div class="brand">
     <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo"/>
-    <span>SimuPrime</span>
-    <span class="topbar-sub">Calculateur de prime de régularité</span>
+    <span class="brand-title">Calculateur de prime de régularité</span>
   </div>
   <div class="topbar-actions">
     {% if role == 'admin' %}<a class="btn btn-ghost btn-sm" href="/admin">⚙ Admin</a>{% endif %}
@@ -40,18 +39,21 @@
 
       <section class="card reveal" style="--d:.1s">
         <h2><span class="chip">2</span> Paramètres</h2>
-        <div class="grid-3">
+        <div class="grid-4">
           <div class="field"><label for="hire-date">Date d'embauche *</label>
             <input id="hire-date" type="date"/></div>
           <div class="field"><label for="reference-date">Date de référence</label>
             <input id="reference-date" type="date"/>
-            <button id="btn-eom" class="linklike" type="button">🗓 Fin du mois de performance</button></div>
+            <button id="btn-eom" class="linklike" type="button">🗓 Fin du mois</button></div>
           <div class="field"><label for="site">Site (payplan) *</label>
             <select id="site">
               <option value="ANTA">ANTA — Antananarivo</option>
               <option value="TMM">TMM — Tamatave</option>
               <option value="AUTRE">AUTRE</option>
             </select></div>
+          <div class="field"><label for="base-heures">Base d'heures *</label>
+            <input id="base-heures" type="number" min="1" step="0.5" placeholder="ex : 176"/>
+            <span class="muted small">Ex. : 176 h/mois</span></div>
         </div>
       </section>
 
@@ -67,7 +69,6 @@
             <tbody id="my-sims-body"></tbody>
           </table>
         </div>
-        <p class="muted small">Simulations propres à votre session.</p>
       </section>
 
     </div>
@@ -78,8 +79,7 @@
       <section class="card reveal" style="--d:.08s">
         <h2><span class="chip">3</span> Activités du mois
           <span class="muted small" id="act-count" style="margin-left:auto"></span></h2>
-        <p class="muted small">ID d'activité → CPSA automatique ·
-           Prime = Σ [ montant base × (heures activité ÷ heures totales) ].</p>
+        <p class="muted small">Prime = Σ [ (montant base × heures activité) ÷ base d'heures ].</p>
         <div id="activites"></div>
         <div class="act-toolbar">
           <button id="btn-add-act" class="btn btn-ghost btn-sm">＋ Activité</button>
@@ -87,7 +87,7 @@
         </div>
         <div class="calc-row">
           <button id="btn-calculate" class="btn btn-primary">✨ Calculer ma prime</button>
-          <button id="btn-reset" class="btn btn-ghost" title="Tout effacer pour une nouvelle simulation">🔄 Nouvelle simulation</button>
+          <button id="btn-reset" class="btn btn-ghost">🔄 Nouvelle simulation</button>
         </div>
       </section>
 
@@ -96,13 +96,13 @@
         <div id="result-placeholder">
           <div class="ph-steps">
             <div class="ph-step"><b>1.</b> Recherchez le matricule du collaborateur</div>
-            <div class="ph-step"><b>2.</b> Renseignez les ID d'activités et les heures</div>
+            <div class="ph-step"><b>2.</b> Renseignez la base d'heures, les activités et les heures</div>
             <div class="ph-step"><b>3.</b> Sélectionnez les profils des 3 derniers mois</div>
-            <div class="ph-step"><b>4.</b> Lancez le calcul — le détail du payplan s'affichera ici</div>
+            <div class="ph-step"><b>4.</b> Lancez le calcul — le détail s'affichera ici</div>
           </div>
           <div class="ph-profils" id="ph-profils"></div>
           <div class="ph-formule">
-            Prime = Σ [ Montant base de l'activité × (heures de l'activité ÷ heures totales) ]
+            Prime = Σ [ (Montant base × heures activité) ÷ base d'heures ]
           </div>
         </div>
       </section>
