@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Connexion MongoDB + helpers payplan/référentiel (v6)."""
+"""Connexion MongoDB + helpers payplan/référentiel (v7)."""
 import os
 from datetime import datetime, timezone
 
@@ -9,9 +9,11 @@ from payplan_config import PROFILE_POINTS as DEFAULT_PROFILE_POINTS
 from payplan_config import PAYPLAN_RULES as DEFAULT_RULES
 from payplan_config import REF_MSA_SEED
 
-# ⚙️ Augmentez ces numéros pour FORCER la réinitialisation depuis payplan_config.py
-PAYPLAN_VERSION = 6
-REF_VERSION = 6
+PAYPLAN_VERSION = 7   # v7 : profils en noms complets (Leader/Fragile/…)
+REF_VERSION = 6       # inchangé : conserve votre référentiel importé
+
+# Anciens codes -> nouveaux noms complets (migration automatique)
+KEY_MAP = {"L": "Leader", "F": "Fragile", "SI": "Soutien Intense"}
 
 _client = None
 _db = None
@@ -56,19 +58,33 @@ def _rules_from_db(rules):
         out.append(r)
     return out
 
+def _migrate_profils(old):
+    """Conserve les valeurs personnalisées, renomme L/F/SI en noms complets,
+    et ne garde que les 4 profils standards."""
+    base = dict(DEFAULT_PROFILE_POINTS)
+    for k, v in (old or {}).items():
+        k2 = KEY_MAP.get(str(k), str(k))
+        if k2 in base:
+            base[k2] = v
+    return base
+
 def get_payplan():
-    """Payplan depuis la BDD. Si absent OU ancien format (version différente),
-    réinitialisation AUTOMATIQUE depuis payplan_config.py → les règles par
-    défaut (L1-L9) apparaissent sans rien cliquer."""
     db = get_db()
     doc = db.payplan.find_one({"_id": "active"})
-    if not doc or doc.get("version") != PAYPLAN_VERSION:
-        doc = {"_id": "active", "version": PAYPLAN_VERSION,
-               "profils": dict(DEFAULT_PROFILE_POINTS),
-               "regles": _rules_to_db(DEFAULT_RULES),
-               "updated_at": datetime.now(timezone.utc)}
-        db.payplan.replace_one({"_id": "active"}, doc, upsert=True)
-    return dict(doc.get("profils") or {}), _rules_from_db(doc.get("regles"))
+    if doc and doc.get("version") == PAYPLAN_VERSION:
+        return dict(doc.get("profils") or {}), _rules_from_db(doc.get("regles"))
+    if doc and doc.get("regles"):
+        # Migration douce : noms de profils convertis, règles/montants conservés
+        profils = _migrate_profils(doc.get("profils"))
+        regles = _rules_from_db(doc.get("regles"))
+    else:
+        profils, regles = dict(DEFAULT_PROFILE_POINTS), DEFAULT_RULES
+    db.payplan.replace_one(
+        {"_id": "active"},
+        {"_id": "active", "version": PAYPLAN_VERSION, "profils": profils,
+         "regles": _rules_to_db(regles), "updated_at": datetime.now(timezone.utc)},
+        upsert=True)
+    return profils, _rules_from_db(regles)
 
 def save_payplan(profils, regles):
     db = get_db()
