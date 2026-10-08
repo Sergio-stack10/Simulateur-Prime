@@ -41,7 +41,7 @@ def _rules_to_db(rules):
         r.setdefault("embauche_apres", None)
         r.setdefault("index", (i + 1) * 10)
         r.setdefault("explication", "")
-        r["montants"] = {str(k): int(v) for k, v in r["montants"].items()}
+        r["montants"] = _norm_montants(r.get("montants"))
         out.append(r)
     return out
 
@@ -54,9 +54,26 @@ def _rules_from_db(rules):
         r.setdefault("embauche_apres", None)
         r.setdefault("index", (i + 1) * 10)
         r.setdefault("explication", "")
-        r["montants"] = {int(k): int(v) for k, v in (r.get("montants") or {}).items()}
+        r["montants"] = _norm_montants(r.get("montants"))
         out.append(r)
     return out
+
+def _norm_montants(m):
+    """Accepte l'ancien format {points: montant} ET le nouveau [{min,max,montant}]."""
+    if isinstance(m, dict):
+        return sorted(({"min": int(k), "max": int(k), "montant": int(v)}
+                       for k, v in m.items()), key=lambda x: x["min"])
+    if isinstance(m, list):
+        out = []
+        for p in m:
+            try:
+                out.append({"min": int(p.get("min", 0)),
+                            "max": int(p.get("max", p.get("min", 0))),
+                            "montant": int(p.get("montant", 0))})
+            except (TypeError, ValueError, AttributeError):
+                continue
+        return sorted(out, key=lambda x: x["min"])
+    return []
 
 def _migrate_profils(old):
     """Conserve les valeurs personnalisées, renomme L/F/SI en noms complets,
