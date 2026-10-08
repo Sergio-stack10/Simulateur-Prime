@@ -268,4 +268,25 @@ body.login-page{min-height:100vh;display:flex;align-items:center;justify-content
 .msa-resolved.unknown .dot{background:var(--error)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .table input{padding:7px 9px;font-size:.88rem}
+
+/* ---------- V6 : page remplie + détails payplan ---------- */
+.ref-import{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
+.ph-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px}
+.ph-step{background:#f6f9fd;border:1px dashed var(--border);border-radius:10px;
+  padding:10px 12px;font-size:.88rem;color:var(--muted)}
+.ph-profils{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.ph-formule{background:linear-gradient(90deg,#f1f5fa,#ecfeff);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;font-size:.9rem;font-weight:600;color:var(--primary-dark)}
+.bareme-row,.ph-profils{display:flex;flex-wrap:wrap;gap:6px}
+.bchip{background:#f1f5fa;border:1px solid var(--border);border-radius:999px;
+  padding:3px 11px;font-size:.8rem;font-weight:600;color:var(--text)}
+.bchip.hit{background:linear-gradient(120deg,#fff3d6,#fde7b8);border-color:#e9b949;
+  color:#8a5a00;box-shadow:0 2px 8px rgba(233,185,73,.35)}
+.rule-detail{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;
+  background:#fafcff;overflow:hidden}
+.rule-detail summary{cursor:pointer;padding:10px 14px;font-weight:600;font-size:.9rem;
+  color:var(--primary-dark)}
+.rule-detail summary:hover{background:#f1f5fa}
+.rd-body{padding:4px 14px 12px}
+.rule-detail .formula{background:#f6f9fd;border-radius:8px;padding:8px 10px;margin-top:8px}
 }
