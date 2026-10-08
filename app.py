@@ -514,6 +514,139 @@ def api_upload():
     return jsonify({"ok": True,
                     "message": f"Extraction ACTIF enregistrée : {len(docs)} collaborateurs."})
 
+@app.post("/api/payplan/upload")
+@admin_required
+def api_payplan_upload():
+    """Import du payplan depuis la matrice Excel :
+    Date · Avant · Après · Site · MSA · Anc_min · Anc_max · Pts_min · Pts_max · Montant · Index"""
+    file = request.files.get("file")
+    if file is None or file.filename == "":
+        return jsonify({"ok": False, "error": "Aucun fichier reçu."}), 400
+    if not file.filename.lower().endswith((".xlsx", ".xls")):
+        return jsonify({"ok": False, "error": "Format attendu : Excel (.xlsx/.xls)."}), 400
+    try:
+        df = pd.read_excel(file, sheet_name=0)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Fichier illisible : {exc}"}), 400
+
+    def norm(c):
+        return (str(c).strip().lower()
+                .replace("é", "e").replace("è", "e").replace("ê", "e")
+                .replace("à", "a").replace(" ", "").replace("-", "")
+                .replace("_", "").replace(".", ""))
+    cols = {norm(c): c for c in df.columns}
+    def find(*cands):
+        for cand in cands:
+            if cand in cols:
+                return cols[cand]
+        return None
+
+    c_date  = find("date")
+    c_avant = find("avant", "embaucheavant")
+    c_apres = find("apres", "embaucheapres")
+    c_site  = find("site", "poste")
+    c_msa   = find("msa", "cpsa", "projetmsa", "specificationprojetmsa", "specification")
+    c_amin  = find("ancmin", "anciennetemin")
+    c_amax  = find("ancmax", "anciennetemax")
+    c_pmin  = find("ptsmin", "pointsmin", "pointmin")
+    c_pmax  = find("ptsmax", "pointsmax", "pointmax")
+    c_mont  = find("montant", "montants")
+    c_idx   = find("index", "priorite")
+    c_nom   = find("nom", "regle", "nomregle")
+
+    if not (c_amin and c_pmin and c_pmax and c_mont):
+        return jsonify({"ok": False, "error": "Colonnes requises manquantes. "
+                        "Attendu au minimum : Site · MSA · Anc_min · Anc_max · "
+                        "Pts_min · Pts_max · Montant (+ Date · Avant · Après · Index)."}), 400
+
+    def to_iso(v):
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        if isinstance(v, (pd.Timestamp, datetime)):
+            return v.date().isoformat()
+        if isinstance(v, date):
+            return v.isoformat()
+        s = str(v).strip()
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(s, fmt).date().isoformat()
+            except ValueError:
+                continue
+        return None
+
+    def to_int(v):
+        try:
+            return int(float(str(v).replace(",", ".")))
+        except (TypeError, ValueError):
+            return None
+
+    groups = {}
+    for _, r in df.iterrows():
+        site = _clean(r.get(c_site)).upper()
+        msa_raw = _clean(r.get(c_msa))
+        msa = [m for m in re.split(r"[,;/|\s]+", msa_raw.upper()) if m] if msa_raw else []
+        amin = to_int(r.get(c_amin))
+        pmin = to_int(r.get(c_pmin))
+        pmax = to_int(r.get(c_pmax))
+        montant = to_int(r.get(c_mont))
+        if None in (amin, pmin, pmax, montant):
+            continue
+        amax = to_int(r.get(c_amax)) if _clean(r.get(c_amax)) != "" else None
+        idx = to_int(r.get(c_idx)) if c_idx else None
+
+        date_pivot = to_iso(r.get(c_date)) if c_date else None
+        avant = apres = None
+        if c_avant and _clean(r.get(c_avant)):
+            avant = to_iso(r.get(c_avant)) or date_pivot
+        if c_apres and _clean(r.get(c_apres)):
+            apres = to_iso(r.get(c_apres)) or date_pivot
+
+        key = (idx if idx is not None else 9999, site, tuple(msa), avant, apres, amin, amax)
+        groups.setdefault(key, []).append({"min": pmin, "max": pmax, "montant": montant})
+
+    def libelle(site, msa, avant, apres, amin, amax):
+        s = site or "Tous sites"
+        if avant:
+            s += f" · Avant {avant}"
+        elif apres:
+            s += f" · Après {apres}"
+        if msa:
+            s += " · " + ", ".join(msa)
+        return s + f" · {amin}" + (f"-{amax}" if amax is not None else " et +") + " mois"
+
+    rules = []
+    for (idx, site, msa, avant, apres, amin, amax), paliers in groups.items():
+        paliers.sort(key=lambda p: p["min"])
+        for a, b in zip(paliers, paliers[1:]):
+            if b["min"] <= a["max"]:
+                return jsonify({"ok": False, "error":
+                    f"Paliers en chevauchement ({a['min']}-{a['max']} et {b['min']}-{b['max']}) "
+                    f"pour : {libelle(site, msa, avant, apres, amin, amax)}"}), 400
+        nom = None
+        if c_nom:
+            nom = _clean(r.get(c_nom)) if False else None  # nom par groupe géré ci-dessous
+        rules.append({
+            "nom": libelle(site, msa, avant, apres, amin, amax),
+            "sites": site, "msa": ", ".join(msa),
+            "embauche_avant": avant, "embauche_apres": apres,
+            "index": idx, "anciennete_min": amin, "anciennete_max": amax,
+            "nb_mois_profil": 2 if (amax is not None and amax <= 6) else 3,
+            "montants": paliers,
+            "explication": "Importé depuis la matrice Excel"})
+
+    if not rules:
+        return jsonify({"ok": False, "error": "Aucune ligne exploitable trouvée."}), 400
+    try:
+        regles_valid = _validate_regles(rules)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    profils, _ = get_payplan()          # profils actuels conservés
+    save_payplan(profils, regles_valid)
+    return jsonify({"ok": True, "message": f"Payplan importé : {len(regles_valid)} règles.",
+                    "profils": profils, "regles": regles_valid})
+
+
 # -------------------------------------------------------------------- Stats
 @app.get("/api/stats")
 @admin_required
