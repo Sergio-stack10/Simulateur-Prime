@@ -1,13 +1,11 @@
 /* ============================================================
-   SimuPrime v6 — admin.js COMPLET
-   Stats · ACTIF · Référentiel (tableau + import Excel) ·
-   Payplan (profils + règles matrice) · Historique
+   Admin v11 — Stats · ACTIF · Référentiel · Payplan (éditeur
+   paliers + import Excel matrice) · Historique
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 let allSims = [];
 
-/* ---------------- Utilitaires ---------------- */
 function esc(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -35,41 +33,33 @@ function countUp(el, target, { dur = 900 } = {}) {
   })(t0);
 }
 
-/* ---------------- Initialisation ---------------- */
 document.addEventListener("DOMContentLoaded", async () => {
   $("#btn-logout").onclick = logout;
 
-  /* --- Extraction ACTIF (glisser-déposer + clic) --- */
   const dz = $("#dropzone"), fi = $("#file-actif");
   dz.onclick = () => fi.click();
   dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("dragover"); };
   dz.ondragleave = () => dz.classList.remove("dragover");
-  dz.ondrop = (e) => {
-    e.preventDefault(); dz.classList.remove("dragover");
-    if (e.dataTransfer.files[0]) uploadActif(e.dataTransfer.files[0]);
-  };
+  dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove("dragover");
+    if (e.dataTransfer.files[0]) uploadActif(e.dataTransfer.files[0]); };
   fi.onchange = () => { if (fi.files[0]) uploadActif(fi.files[0]); };
 
-  /* --- Référentiel Activités ↔ CPSA --- */
   $("#ref-add").onclick = () => $("#ref-body").appendChild(refRow("", "", ""));
   $("#ref-reset").onclick = resetRef;
   $("#ref-save").onclick = saveRef;
   $("#ref-import-btn").onclick = () => $("#file-ref").click();
   $("#file-ref").onchange = () => { const f = $("#file-ref").files[0]; if (f) uploadRef(f); };
 
-  /* --- Payplan --- */
+  $("#pp-import-btn").onclick = () => $("#file-payplan").click();
+  $("#file-payplan").onchange = () => { const f = $("#file-payplan").files[0]; if (f) uploadPayplan(f); };
   $("#pp-add-profil").onclick = () => $("#pp-profiles").appendChild(profilRow("", 1));
   $("#pp-add-rule").onclick = () => $("#pp-rules").appendChild(ruleCard({
-    nom: "Nouvelle règle", sites: "", msa: "",
-    embauche_avant: null, embauche_apres: null, index: null,
-    anciennete_min: 4, anciennete_max: null, nb_mois_profil: 3,
-    montants: { 7: 185000 }, explication: ""
-  }));
-  $("#pp-reset-file").onclick = resetFromFile;
+    nom: "Nouvelle règle", sites: "", msa: "", embauche_avant: null, embauche_apres: null,
+    index: null, anciennete_min: 4, anciennete_max: null, nb_mois_profil: 3,
+    montants: [{ min: 0, max: 2, montant: 0 }], explication: "" }));
   $("#pp-reset").onclick = () => loadPayplan();
   $("#pp-save").onclick = savePayplan;
 
-  /* --- Historique --- */
   $("#btn-refresh-admin-sims").onclick = loadSims;
   $("#btn-export-csv").onclick = () => exportCSV(allSims);
   $("#sims-search").oninput = renderSims;
@@ -81,8 +71,6 @@ async function logout() {
   try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {}
   location.href = "/login";
 }
-
-/* ---------------- Stats ---------------- */
 async function loadStats() {
   try {
     const j = await api("/api/stats");
@@ -95,15 +83,14 @@ async function loadStats() {
   } catch (e) {}
 }
 
-/* ---------------- Upload ACTIF ---------------- */
+/* ---------------- ACTIF ---------------- */
 async function uploadActif(file) {
   if (!/\.(xlsx|xls)$/i.test(file.name)) { toast("Format attendu : .xlsx", "error"); return; }
   $("#upload-status").textContent = "⏳ Chargement de " + file.name + "…";
   const fd = new FormData(); fd.append("file", file);
   try {
     const j = await api("/api/upload", { method: "POST", body: fd });
-    if (j.ok) { toast(j.message, "success");
-      $("#upload-status").textContent = "✅ " + j.message; await loadStats(); }
+    if (j.ok) { toast(j.message, "success"); $("#upload-status").textContent = "✅ " + j.message; await loadStats(); }
     else { toast(j.error, "error"); $("#upload-status").textContent = "❌ " + j.error; }
   } catch (e) { $("#upload-status").textContent = "❌ Erreur réseau"; }
 }
@@ -124,21 +111,18 @@ function refRow(id, msa, lib) {
     <td><input class="rf-id" placeholder="ex : W0ZRVV" value="${esc(id)}"/></td>
     <td><input class="rf-msa" placeholder="ex : WHFR2729" value="${esc(msa)}"/></td>
     <td><input class="rf-lib" placeholder="ex : DRM - FRAIS DE ROUTE" value="${esc(lib)}"/></td>
-    <td><button class="btn btn-danger btn-sm" title="Supprimer">✕</button></td>`;
+    <td><button class="btn btn-danger btn-sm">✕</button></td>`;
   tr.querySelector("button").onclick = () => tr.remove();
   return tr;
 }
 async function saveRef() {
   const rows = [...document.querySelectorAll("#ref-body tr")].map((tr) => ({
-    id: tr.querySelector(".rf-id").value,
-    msa: tr.querySelector(".rf-msa").value,
-    libelle: tr.querySelector(".rf-lib").value
-  }));
+    id: tr.querySelector(".rf-id").value, msa: tr.querySelector(".rf-msa").value,
+    libelle: tr.querySelector(".rf-lib").value }));
   const btn = $("#ref-save"); btn.disabled = true; btn.textContent = "⏳…";
   try {
-    const j = await api("/api/ref-msa", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows }) });
+    const j = await api("/api/ref-msa", { method: "PUT",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows }) });
     if (j.ok) { toast("✅ " + j.message, "success"); await loadRef(); }
     else toast(j.error, "error");
   } catch (e) { toast("Erreur réseau.", "error"); }
@@ -173,23 +157,34 @@ async function loadPayplan() {
     Object.entries(j.profils).forEach(([l, p]) => pc.appendChild(profilRow(l, p)));
     const rc = $("#pp-rules"); rc.innerHTML = "";
     j.regles.forEach((r) => rc.appendChild(ruleCard(r)));
+    // Avertissement : règles dont le plus haut palier est à 0 (montants non configurés)
+    const suspects = j.regles.filter((r) => {
+      const m = (r.montants || []).slice().sort((a, b) => a.min - b.min);
+      return m.length && m[m.length - 1].montant === 0;
+    });
+    const w = $("#pp-warning");
+    w.hidden = suspects.length === 0;
+    w.textContent = `⚠ ${suspects.length} règle(s) avec montants à 0 — importez votre matrice Excel ou saisissez les montants.`;
   } catch (e) { toast("Impossible de charger le payplan.", "error"); }
 }
-async function resetFromFile() {
-  if (!confirm("Remplacer le payplan actuel par les valeurs du fichier payplan_config.py ?")) return;
+async function uploadPayplan(file) {
+  if (!/\.(xlsx|xls)$/i.test(file.name)) { toast("Format attendu : .xlsx", "error"); return; }
+  if (!confirm("Remplacer le payplan actuel par le contenu de « " + file.name + " » ?")) return;
+  $("#pp-import-status").textContent = "⏳ Import de " + file.name + "…";
+  const fd = new FormData(); fd.append("file", file);
   try {
-    const j = await api("/api/payplan/reset", { method: "POST" });
-    if (j.ok) { toast("✅ " + j.message, "success"); await loadPayplan(); }
-    else toast(j.error, "error");
-  } catch (e) { toast("Erreur réseau.", "error"); }
+    const j = await api("/api/payplan/upload", { method: "POST", body: fd });
+    if (j.ok) { toast("✅ " + j.message, "success");
+      $("#pp-import-status").textContent = "✅ " + j.message; await loadPayplan(); }
+    else { toast(j.error, "error"); $("#pp-import-status").textContent = "❌ " + j.error; }
+  } catch (e) { $("#pp-import-status").textContent = "❌ Erreur réseau"; }
 }
 function profilRow(label, pts) {
   const div = document.createElement("div"); div.className = "pp-row";
   div.innerHTML = `
-    <input class="pp-label" placeholder="Code profil (ex : SI)" value="${esc(label)}"/>
-    <input class="pp-pts" type="number" min="0" max="20" placeholder="vide"
-           value="${pts ?? ""}"/> pt(s)
-    <button class="btn btn-danger btn-sm" title="Supprimer">✕</button>`;
+    <input class="pp-label" placeholder="Nom du profil (ex : Soutien Intense)" value="${esc(label)}"/>
+    <input class="pp-pts" type="number" min="0" max="20" placeholder="vide" value="${pts ?? ""}"/> pt(s)
+    <button class="btn btn-danger btn-sm">✕</button>`;
   div.querySelector("button").onclick = () => div.remove();
   return div;
 }
@@ -201,10 +196,10 @@ function ruleCard(r) {
     .slice().sort((a, b) => (a.min || 0) - (b.min || 0));
   div.innerHTML = `
     <div class="rule-head">
-      <span class="rule-idx" title="Priorité : plus petit = appliqué en premier (après les règles CPSA)">
+      <span class="rule-idx" title="Priorité (plus petit = appliqué en premier, après les règles CPSA)">
         #<input class="r-index" type="number"/></span>
       <input class="r-nom" value="${esc(r.nom || "")}" placeholder="Nom de la règle"/>
-      <button class="btn btn-danger btn-sm r-del" title="Supprimer la règle">🗑</button>
+      <button class="btn btn-danger btn-sm r-del">🗑</button>
     </div>
     <div class="rule-grid">
       <div class="field"><label>Sites (vide = tous)</label>
@@ -227,32 +222,29 @@ function ruleCard(r) {
       <div class="field"><label>Explication</label>
         <input class="r-exp" value="${esc(r.explication || "")}"/></div>
     </div>
-    <label class="field-label">Barème : points → montant (Ar)</label>
+    <label class="field-label">Barème (paliers) : de [min] à [max] points → montant (Ar)</label>
     <div class="montants"></div>
-    <button class="btn btn-ghost btn-sm m-add">+ Ligne</button>`;
+    <button class="btn btn-ghost btn-sm m-add">+ Palier</button>`;
   div.querySelector(".r-index").value = r.index ?? "";
   div.querySelector(".r-nb").value = String(r.nb_mois_profil || 3);
   const mcont = div.querySelector(".montants");
-  const addM = (k, v) => {
+  const addM = (p) => {
     const row = document.createElement("div"); row.className = "m-row";
     row.innerHTML = `
-      <input class="m-min" type="number" min="0" placeholder="de" value="${k?.min ?? ""}"/>
-      à <input class="m-max" type="number" min="0" placeholder="à" value="${k?.max ?? ""}"/> pts →
-      <input class="m-val" type="number" min="0" placeholder="Montant" value="${k?.montant ?? ""}"/> Ar
-      <button class="btn btn-danger btn-sm" title="Supprimer">✕</button>`;
+      <input class="m-min" type="number" min="0" placeholder="de" value="${p?.min ?? ""}"/> à
+      <input class="m-max" type="number" min="0" placeholder="à" value="${p?.max ?? ""}"/> pts →
+      <input class="m-val" type="number" min="0" placeholder="Montant" value="${p?.montant ?? ""}"/> Ar
+      <button class="btn btn-danger btn-sm">✕</button>`;
     row.querySelector("button").onclick = () => row.remove();
     mcont.appendChild(row);
   };
-  monts.forEach(([k, v]) => addM(k, v));
-  if (!monts.length) addM("", "");
-  div.querySelector(".m-add").onclick = () => addM("", "");
-  div.querySelector(".r-del").onclick = () => {
-    if (confirm("Supprimer cette règle ?")) div.remove();
-  };
+  monts.forEach((p) => addM(p));
+  if (!monts.length) addM(null);
+  div.querySelector(".m-add").onclick = () => addM(null);
+  div.querySelector(".r-del").onclick = () => { if (confirm("Supprimer cette règle ?")) div.remove(); };
   return div;
 }
 async function savePayplan() {
-  /* Profils (champ vide = « Non évalué », aucun point) */
   const profils = {};
   for (const row of document.querySelectorAll("#pp-profiles .pp-row")) {
     const l = row.querySelector(".pp-label").value.trim();
@@ -269,7 +261,6 @@ async function savePayplan() {
   }
   if (!Object.keys(profils).length) { toast("Au moins un profil est requis.", "error"); return; }
 
-  /* Règles */
   const regles = [];
   for (const div of document.querySelectorAll("#pp-rules .rule-card")) {
     const nom = div.querySelector(".r-nom").value.trim() || "Règle";
@@ -280,32 +271,26 @@ async function savePayplan() {
       const v = parseInt(row.querySelector(".m-val").value);
       if (!isNaN(mn) && !isNaN(mx) && !isNaN(v)) montants.push({ min: mn, max: mx, montant: v });
     }
-    if (!Object.keys(montants).length) {
-      toast("La règle « " + nom + " » n'a aucun montant.", "error"); return; }
+    if (!montants.length) { toast("La règle « " + nom + " » n'a aucun palier.", "error"); return; }
     const amaxRaw = div.querySelector(".r-amax").value;
     regles.push({
-      nom,
-      sites: div.querySelector(".r-sites").value,
-      msa: div.querySelector(".r-msa").value,
+      nom, sites: div.querySelector(".r-sites").value, msa: div.querySelector(".r-msa").value,
       embauche_avant: div.querySelector(".r-avant").value,
       embauche_apres: div.querySelector(".r-apres").value,
       index: parseInt(div.querySelector(".r-index").value) || undefined,
       anciennete_min: parseInt(div.querySelector(".r-amin").value) || 0,
       anciennete_max: amaxRaw === "" ? null : parseInt(amaxRaw),
       nb_mois_profil: parseInt(div.querySelector(".r-nb").value),
-      montants,
-      explication: div.querySelector(".r-exp").value
-    });
+      montants, explication: div.querySelector(".r-exp").value });
   }
   if (!regles.length) { toast("Au moins une règle est requise.", "error"); return; }
 
-  const btn = $("#pp-save");
-  btn.disabled = true; btn.textContent = "⏳ Enregistrement…";
+  const btn = $("#pp-save"); btn.disabled = true; btn.textContent = "⏳ Enregistrement…";
   try {
-    const j = await api("/api/payplan", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
+    const j = await api("/api/payplan", { method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ profils, regles }) });
-    if (j.ok) { toast("✅ " + j.message + " Appliqué immédiatement.", "success"); await loadPayplan(); }
+    if (j.ok) { toast("✅ " + j.message, "success"); await loadPayplan(); }
     else toast(j.error, "error");
   } catch (e) { toast("Erreur réseau.", "error"); }
   finally { btn.disabled = false; btn.textContent = "💾 Enregistrer le payplan"; }
@@ -315,8 +300,7 @@ async function savePayplan() {
 async function loadSims() {
   try {
     const j = await api("/api/simulations?scope=all&limit=200");
-    allSims = j.data || [];
-    renderSims();
+    allSims = j.data || []; renderSims();
   } catch (e) {}
 }
 function renderSims() {
@@ -324,22 +308,16 @@ function renderSims() {
   const rows = allSims.filter((r) => !q ||
     [r.matricule, r.nom, r.site].some((v) => String(v ?? "").toLowerCase().includes(q)));
   $("#admin-sims-body").innerHTML = rows.map((r) => {
-    const acts = r.activites
-      ? r.activites.map((a) => a.activity_id || a.msa).join(", ")
-      : (r.profiles || []).join(" / ");
-    const pts = r.activites
-      ? r.activites.map((a) => a.total_points).join("/")
-      : r.total_points;
-    return `
-      <tr>
-        <td>${new Date(r.created_at).toLocaleString("fr-FR")}</td>
-        <td>${esc(r.matricule || "—")}</td>
-        <td>${esc(r.nom || "—")}</td>
-        <td>${esc(r.site || "")}</td>
-        <td>${esc(acts || "—")}<br/><span class="muted small">${pts ?? ""} pts</span></td>
-        <td>${r.montant_prime != null ? fmt.format(r.montant_prime) + " Ar" : "—"}</td>
-        <td>${r.eligible ? '<span class="badge ok">Éligible</span>' : '<span class="badge">Non</span>'}</td>
-      </tr>`;
+    const acts = r.activites ? r.activites.map((a) => a.activity_id || a.msa).join(", ")
+                             : (r.profiles || []).join(" / ");
+    const pts = r.activites ? r.activites.map((a) => a.total_points).join("/") : r.total_points;
+    return `<tr>
+      <td>${new Date(r.created_at).toLocaleString("fr-FR")}</td>
+      <td>${esc(r.matricule || "—")}</td><td>${esc(r.nom || "—")}</td>
+      <td>${esc(r.site || "")}</td>
+      <td>${esc(acts || "—")}<br/><span class="muted small">${pts ?? ""} pts</span></td>
+      <td>${r.montant_prime != null ? fmt.format(r.montant_prime) + " Ar" : "—"}</td>
+      <td>${r.eligible ? '<span class="badge ok">Éligible</span>' : '<span class="badge">Non</span>'}</td></tr>`;
   }).join("") || `<tr><td colspan="7" class="muted center">Aucune simulation.</td></tr>`;
   $("#sims-count").textContent = rows.length + " ligne(s)";
 }
@@ -348,25 +326,17 @@ function exportCSV(rows) {
   const head = ["Date", "Matricule", "Nom", "Site", "Anciennete (mois)",
                 "Activites (ID)", "Points", "Eligible", "Montant (Ar)"];
   const lines = rows.map((r) => {
-    const acts = r.activites
-      ? r.activites.map((a) => a.activity_id || a.msa).join(", ")
-      : (r.profiles || []).join("/");
-    const pts = r.activites
-      ? r.activites.map((a) => a.total_points).join("/")
-      : r.total_points;
-    return [
-      new Date(r.created_at).toLocaleString("fr-FR"),
-      r.matricule || "", r.nom || "", r.site || "",
-      r.anciennete_mois ?? "", acts, pts,
-      r.eligible ? "Oui" : "Non", r.montant_prime ?? ""
-    ];
+    const acts = r.activites ? r.activites.map((a) => a.activity_id || a.msa).join(", ")
+                             : (r.profiles || []).join("/");
+    const pts = r.activites ? r.activites.map((a) => a.total_points).join("/") : r.total_points;
+    return [new Date(r.created_at).toLocaleString("fr-FR"), r.matricule || "", r.nom || "",
+      r.site || "", r.anciennete_mois ?? "", acts, pts,
+      r.eligible ? "Oui" : "Non", r.montant_prime ?? ""];
   });
   const csv = [head, ...lines]
-    .map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";"))
-    .join("\r\n");
+    .map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
-  a.download = "simulations.csv";
-  a.click();
+  a.download = "simulations.csv"; a.click();
   toast("Export CSV téléchargé.", "success");
 }
