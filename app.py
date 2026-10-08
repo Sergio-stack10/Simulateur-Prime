@@ -438,6 +438,12 @@ def api_simulations():
     cur = get_db().simulations.find(q, {"_id": 0}).sort("created_at", -1).limit(limit)
     return jsonify({"ok": True, "data": list(cur)})
 
+@app.delete("/api/simulations/mine")
+@login_required
+def api_sims_clear_mine():
+    get_db().simulations.delete_many({"sid": current_user()["sid"]})
+    return jsonify({"ok": True, "message": "Vos simulations ont été supprimées."})
+
 # ------------------------------------------------------------------- Upload
 @app.route("/api/upload", methods=["POST"])
 @admin_required
