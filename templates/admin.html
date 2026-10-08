@@ -64,6 +64,11 @@
     <p class="muted small">Chaque ID d'activité saisi dans le simulateur affiche
        automatiquement le MSA du projet selon ce tableau. Modifiable librement :
        ajouter, modifier ou supprimer des lignes.</p>
+    <div class="ref-import">
+      <input type="file" id="file-ref" accept=".xlsx,.xls" hidden/>
+      <button id="ref-import-btn" class="btn btn-ghost btn-sm">📥 Importer l'Excel du référentiel</button>
+      <span id="ref-import-status" class="muted small"></span>
+    </div>
     <div class="table-wrap">
       <table class="table">
         <thead><tr><th style="width:150px">ID activité</th><th style="width:150px">MSA</th>
