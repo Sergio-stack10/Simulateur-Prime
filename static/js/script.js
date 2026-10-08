@@ -1,14 +1,14 @@
 /* ============================================================
-   SimuPrime v6 — script.js COMPLET
-   ID activité → CPSA · profils L/F/SI · base + prorata · détail payplan
+   SimuPrime v7 — script.js COMPLET
+   Profils complets · dégradation · bouton nouvelle simulation
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
-const REF = {};                 // { "W0ZRVV": {msa, libelle} }
-const PROFILE_LABELS = { "L": "Leader", "F": "Fragile", "SI": "Soutien Intense" };
+const REF = {};
 let employee = null;
 const MAX_ACT = 7;
+let placeholderHTML = "";     // contenu d'attente de la carte résultat
 
 /* ---------------- Utilitaires ---------------- */
 function esc(s) {
@@ -40,11 +40,15 @@ function countUp(el, target, { dur = 900, suffix = "" } = {}) {
 
 /* ---------------- Initialisation ---------------- */
 document.addEventListener("DOMContentLoaded", async () => {
+  placeholderHTML = $("#result-card").innerHTML;   // mémorise l'écran d'attente
+
   $("#btn-search").onclick = searchEmployee;
   $("#matricule").addEventListener("keydown", (e) => { if (e.key === "Enter") searchEmployee(); });
   $("#btn-calculate").onclick = calculate;
+  $("#btn-reset").onclick = resetAll;
   $("#btn-logout").onclick = logout;
   $("#btn-refresh-sims").onclick = loadMySims;
+  $("#btn-clear-sims").onclick = clearMySims;
   $("#btn-add-act").onclick = () => addActivity();
   const eomBtn = $("#btn-eom");
   if (eomBtn) eomBtn.onclick = () => { endOfMonth(); toast("Date de référence : fin du mois courant."); };
@@ -54,6 +58,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   addActivity();
   await loadMySims();
 });
+
+/* ---------------- Nouvelle simulation (tout effacer) ---------------- */
+function resetAll() {
+  if (!confirm("Effacer toutes les saisies pour commencer une nouvelle simulation ?")) return;
+  employee = null;
+  $("#matricule").value = "";
+  $("#employee-result").innerHTML = "";
+  $("#hire-date").value = "";
+  $("#site").value = "ANTA";
+  endOfMonth();
+  $("#activites").innerHTML = "";
+  addActivity();
+  const card = $("#result-card");
+  card.hidden = false;
+  card.innerHTML = placeholderHTML;
+  const ph = $("#ph-profils");
+  if (ph) ph.innerHTML = Object.entries(PP.profils).map(([c, p]) =>
+    `<span class="bchip">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  toast("Formulaire réinitialisé — nouvelle simulation prête ✨", "success");
+}
 
 function endOfMonth() {
   const n = new Date();
@@ -93,9 +118,8 @@ async function loadRef() {
 function profileOptionsHTML() {
   return `<option value="" disabled selected>Sélectionner…</option>` +
     Object.entries(PP.profils).map(([code, pts]) => {
-      const nom = PROFILE_LABELS[code] || code;
       const val = (pts === null || pts === undefined) ? "vide" : pts + " pt";
-      return `<option value="${esc(code)}">${esc(code)} — ${esc(nom)} · ${val}</option>`;
+      return `<option value="${esc(code)}">${esc(code)} · ${val}</option>`;
     }).join("");
 }
 
@@ -253,7 +277,7 @@ async function calculate() {
             btn.innerHTML = "✨ Calculer ma prime"; }
 }
 
-/* ------------------ Résultat (v6 : + détail payplan) ------------------ */
+/* ------------------ Résultat ------------------ */
 function renderResult(d) {
   const card = $("#result-card");
   card.hidden = false;
@@ -273,13 +297,16 @@ function renderResult(d) {
     return parts.join(" · ");
   };
 
+  const isDegraded = (a) => (a.detail_points || [])
+    .some((p) => p.note && p.note.includes("dégradation"));
+
   const rows = acts.map((a) => `
     <tr class="${a.eligible ? "" : "off"}">
       <td><b>${esc(a.activity_id || "")}</b> → ${esc(a.msa)}
           ${REF[a.activity_id] && REF[a.activity_id].libelle ? `<br/><span class="muted small">${esc(REF[a.activity_id].libelle)}</span>` : ""}</td>
       <td class="center">${fmt.format(a.heures)} h</td>
       <td class="center">${a.part ?? 0}%</td>
-      <td class="center"><b>${a.total_points}</b> pts</td>
+      <td class="center"><b>${a.total_points}</b> pts${isDegraded(a) ? '<span class="deg-badge">⚠ dégradation</span>' : ""}</td>
       <td>${a.eligible ? fmt.format(a.montant) + " Ar" : "—"}</td>
       <td><b>${fmt.format(a.montant_proratise || 0)} Ar</b></td>
     </tr>`).join("");
@@ -293,7 +320,7 @@ function renderResult(d) {
         <p class="small"><b>Conditions :</b> ${esc(conditions(a))}</p>
         <p class="small"><b>Mois comptés (${a.nb_mois_profil}) :</b>
           ${(a.detail_points || []).filter((p) => p.pris_en_compte)
-            .map((p) => `${p.mois} : ${esc(p.profil)} (${p.note ? esc(p.note) : (p.points === null ? "vide" : p.points + " pt")})`).join(" · ")}</p>
+            .map((p) => `${p.mois} : ${esc(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`).join(" · ")}</p>
         <div class="bareme-row">${baremeChips(a)}</div>
         ${a.eligible ? `<p class="small formula">Base ${fmt.format(a.montant)} Ar ×
           (${fmt.format(a.heures)} h ÷ ${fmt.format(d.total_heures)} h) =
@@ -302,7 +329,8 @@ function renderResult(d) {
     </details>`).join("");
 
   card.innerHTML = `
-    <h2><span class="chip">4</span> Résultat de la simulation</h2>
+    <h2><span class="chip">4</span> Résultat de la simulation
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="resetAll()">🔄 Nouvelle simulation</button></h2>
     ${d.explication && !d.eligible ? `<div class="alert warn">${esc(d.explication)}</div>` : ""}
     <div class="results">
       <div class="result-box">
@@ -342,5 +370,12 @@ async function loadMySims() {
     }).join("");
     $("#my-sims-body").innerHTML = rows ||
       `<tr><td colspan="5" class="muted center">Aucune simulation pour le moment.</td></tr>`;
+  } catch (e) {}
+}
+async function clearMySims() {
+  if (!confirm("Supprimer toutes VOS simulations de cette session ?")) return;
+  try {
+    const j = await api("/api/simulations/mine", { method: "DELETE" });
+    if (j.ok) { toast(j.message, "success"); await loadMySims(); }
   } catch (e) {}
 }
