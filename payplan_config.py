@@ -88,23 +88,12 @@ PAYPLAN_RULES = [
 ]
 
 # -------------------------------------------------------------------------
-# TABLE RÉFÉRENTIELLE : ID activité → MSA (modifiable dans le panneau Admin)
+# RÉFÉRENTIEL : (ID activité, CPSA/MSA, Libellé de l'activité)
+# ⚠️ Valeurs d'exemple — la méthode fiable est l'IMPORT EXCEL (panneau Admin)
 # -------------------------------------------------------------------------
 REF_MSA_SEED = [
-    ("W0ZVC5", "SITECSO"), ("W0ZVBY", "CORPHQ"), ("W0ZV80", "SITECSOTH"),
-    ("W0ZVAN", "SITEHQ"), ("W0ZVBL", "FRANCERGNCSO"), ("W0ZX3M", "980006157"),
-    ("W0ZT0B", "WHFR2822"), ("W0ZM8M", "WHFR9"), ("W0ZNVJ", "WHFR1818"),
-    ("W0ZO6O", "WHFR1834"), ("W0ZQPJ", "WHFR1006"), ("W0ZVPL", "WHFR1039"),
-    ("W0ZR30", "WHFR1039"), ("W0ZRW0", "WHFR2731"), ("W0ZZ7K", "WHFR2373"),
-    ("W0ZM8I", "WHFR965"), ("W0ZOX8", "WHFR1831"), ("W0ZO68", "WHFR1135"),
-    ("W0ZOVY", "WHFR1661"), ("W0ZTD2", "WHFR2857"), ("W0ZPHH", "WHFR56"),
-    ("W0ZQ4M", "WHFR1187"), ("W0ZMZZ", "WHFR1188"), ("W0ZR1Z", "WHFR907"),
-    ("W0ZNW8", "WHFR218"), ("W0ZQ21", "WHFR1830"), ("W0ZMY0", "WHFR1451"),
-    ("W0ZRDE", "WHFR1944"), ("W0ZRFP", "WHFR1154"), ("W0ZPKW", "WHFR1909"),
-    ("W0ZRVV", "WHFR2729"), ("W0ZLN2", "WHFR1732"), ("W0ZTM3", "WHFR2905"),
-    ("W0ZTOJ", "WHFR2914"), ("W0ZVKT", "WHFR216"), ("W0ZHE1", "980000875"),
-    ("W0ZMYX", "WHFR1171"), ("W0ZSI2", "WHFR2749"), ("W0ZOWG", "WHFR711"),
-    ("W0ZASC", "DELRECRUITING"),
+    ("W0ZRVV", "WHFR2729", "DRM - FRAIS DE ROUTE"),
+    # ← complétez quelques lignes, ou importez tout votre Excel (étape 3)
 ]
 
 # =========================================================================
