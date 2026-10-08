@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Connexion MongoDB + helpers payplan/référentiel (v7)."""
+"""Connexion MongoDB + helpers (v10 — rechargement forcé du payplan)."""
 import os
 from datetime import datetime, timezone
 
@@ -9,11 +9,8 @@ from payplan_config import PROFILE_POINTS as DEFAULT_PROFILE_POINTS
 from payplan_config import PAYPLAN_RULES as DEFAULT_RULES
 from payplan_config import REF_MSA_SEED
 
-PAYPLAN_VERSION = 7   # v7 : profils en noms complets (Leader/Fragile/…)
-REF_VERSION = 6       # inchangé : conserve votre référentiel importé
-
-# Anciens codes -> nouveaux noms complets (migration automatique)
-KEY_MAP = {"L": "Leader", "F": "Fragile", "SI": "Soutien Intense"}
+PAYPLAN_VERSION = 10   # ⚠️ changez ce numéro pour forcer un rechargement du fichier
+REF_VERSION = 6        # ne pas toucher (conserve votre référentiel importé)
 
 _client = None
 _db = None
@@ -31,6 +28,22 @@ def get_db():
         _db.simulations.create_index([("sid", 1), ("created_at", -1)])
         _db.simulations.create_index([("created_at", -1)])
     return _db
+
+def _norm_montants(m):
+    if isinstance(m, dict):
+        return sorted(({"min": int(k), "max": int(k), "montant": int(v)}
+                       for k, v in m.items()), key=lambda x: x["min"])
+    if isinstance(m, list):
+        out = []
+        for p in m:
+            try:
+                out.append({"min": int(p.get("min", 0)),
+                            "max": int(p.get("max", p.get("min", 0))),
+                            "montant": int(p.get("montant", 0))})
+            except (TypeError, ValueError, AttributeError):
+                continue
+        return sorted(out, key=lambda x: x["min"])
+    return []
 
 def _rules_to_db(rules):
     out = []
@@ -58,50 +71,21 @@ def _rules_from_db(rules):
         out.append(r)
     return out
 
-def _norm_montants(m):
-    """Accepte l'ancien format {points: montant} ET le nouveau [{min,max,montant}]."""
-    if isinstance(m, dict):
-        return sorted(({"min": int(k), "max": int(k), "montant": int(v)}
-                       for k, v in m.items()), key=lambda x: x["min"])
-    if isinstance(m, list):
-        out = []
-        for p in m:
-            try:
-                out.append({"min": int(p.get("min", 0)),
-                            "max": int(p.get("max", p.get("min", 0))),
-                            "montant": int(p.get("montant", 0))})
-            except (TypeError, ValueError, AttributeError):
-                continue
-        return sorted(out, key=lambda x: x["min"])
-    return []
-
-def _migrate_profils(old):
-    """Conserve les valeurs personnalisées, renomme L/F/SI en noms complets,
-    et ne garde que les 4 profils standards."""
-    base = dict(DEFAULT_PROFILE_POINTS)
-    for k, v in (old or {}).items():
-        k2 = KEY_MAP.get(str(k), str(k))
-        if k2 in base:
-            base[k2] = v
-    return base
-
 def get_payplan():
     db = get_db()
     doc = db.payplan.find_one({"_id": "active"})
     if doc and doc.get("version") == PAYPLAN_VERSION:
         return dict(doc.get("profils") or {}), _rules_from_db(doc.get("regles"))
-    if doc and doc.get("regles"):
-        # Migration douce : noms de profils convertis, règles/montants conservés
-        profils = _migrate_profils(doc.get("profils"))
-        regles = _rules_from_db(doc.get("regles"))
-    else:
-        profils, regles = dict(DEFAULT_PROFILE_POINTS), DEFAULT_RULES
+    # Version différente ou absente → RECHARGEMENT COMPLET depuis le fichier.
+    # (Les montants saisis via Admin → 💾 restent ensuite enregistrés.)
     db.payplan.replace_one(
         {"_id": "active"},
-        {"_id": "active", "version": PAYPLAN_VERSION, "profils": profils,
-         "regles": _rules_to_db(regles), "updated_at": datetime.now(timezone.utc)},
+        {"_id": "active", "version": PAYPLAN_VERSION,
+         "profils": dict(DEFAULT_PROFILE_POINTS),
+         "regles": _rules_to_db(DEFAULT_RULES),
+         "updated_at": datetime.now(timezone.utc)},
         upsert=True)
-    return profils, _rules_from_db(regles)
+    return dict(DEFAULT_PROFILE_POINTS), _rules_from_db(DEFAULT_RULES)
 
 def save_payplan(profils, regles):
     db = get_db()
