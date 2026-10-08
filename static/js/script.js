@@ -1,16 +1,19 @@
 /* ============================================================
-   SimuPrime v7 — script.js COMPLET
-   Profils complets · dégradation · bouton nouvelle simulation
+   SimuPrime v10 — script.js COMPLET
+   · Profils complets + dégradation
+   · Prorata : (montant base × heures activité) ÷ base d'heures
+   · Affichage collaborateur : Matricules, MSA, Projet (ACTIF)
+   · Nom d'activité à côté de « Activité 1 »
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
-const REF = {};
+const REF = {};                 // { "W0ZRVV": {msa, libelle} }
 let employee = null;
 const MAX_ACT = 7;
-let placeholderHTML = "";     // contenu d'attente de la carte résultat
+let placeholderHTML = "";       // écran d'attente de la carte résultat
 
-/* ---------------- Utilitaires ---------------- */
+/* ═══════════════ Utilitaires ═══════════════ */
 function esc(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -38,7 +41,7 @@ function countUp(el, target, { dur = 900, suffix = "" } = {}) {
   })(t0);
 }
 
-/* ---------------- Initialisation ---------------- */
+/* ═══════════════ Initialisation ═══════════════ */
 document.addEventListener("DOMContentLoaded", async () => {
   placeholderHTML = $("#result-card").innerHTML;   // mémorise l'écran d'attente
 
@@ -59,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadMySims();
 });
 
-/* ---------------- Nouvelle simulation (tout effacer) ---------------- */
+/* ═══════════════ Nouvelle simulation (tout effacer) ═══════════════ */
 function resetAll() {
   if (!confirm("Effacer toutes les saisies pour commencer une nouvelle simulation ?")) return;
   employee = null;
@@ -67,17 +70,23 @@ function resetAll() {
   $("#employee-result").innerHTML = "";
   $("#hire-date").value = "";
   $("#site").value = "ANTA";
+  $("#base-heures").value = "";
   endOfMonth();
   $("#activites").innerHTML = "";
   addActivity();
   const card = $("#result-card");
   card.hidden = false;
   card.innerHTML = placeholderHTML;
-  const ph = $("#ph-profils");
-  if (ph) ph.innerHTML = Object.entries(PP.profils).map(([c, p]) =>
-    `<span class="bchip">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
+  fillPhProfils();
   window.scrollTo({ top: 0, behavior: "smooth" });
   toast("Formulaire réinitialisé — nouvelle simulation prête ✨", "success");
+}
+
+function fillPhProfils() {
+  const ph = $("#ph-profils");
+  if (!ph) return;
+  ph.innerHTML = Object.entries(PP.profils).map(([c, p]) =>
+    `<span class="bchip">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
 }
 
 function endOfMonth() {
@@ -94,9 +103,7 @@ async function loadPayplan() {
     const j = await api("/api/payplan");
     if (!j.ok) return;
     PP.profils = j.profils; PP.regles = j.regles;
-    const ph = $("#ph-profils");
-    if (ph) ph.innerHTML = Object.entries(j.profils).map(([c, p]) =>
-      `<span class="bchip">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
+    fillPhProfils();
   } catch (e) { console.error(e); }
 }
 async function loadRef() {
@@ -123,7 +130,7 @@ function profileOptionsHTML() {
     }).join("");
 }
 
-/* ------------------ Activités ------------------ */
+/* ═══════════════ Activités ═══════════════ */
 function addActivity(activityId = "") {
   const cont = $("#activites");
   if (cont.children.length >= MAX_ACT) { toast(`Maximum ${MAX_ACT} activités.`, "error"); return; }
@@ -188,13 +195,13 @@ function addActivity(activityId = "") {
 function refreshActs() {
   let total = 0;
   [...$("#activites").children].forEach((c, i) => {
-    c.querySelector(".act-title").textContent = "Activité " + (i + 1);
     const id = c.querySelector(".a-act").value.trim().toUpperCase();
+    // Nom de l'activité à côté de « Activité N »
+    const lib = REF[id] && REF[id].libelle ? REF[id].libelle : "";
+    c.querySelector(".act-title").textContent = "Activité " + (i + 1) + (lib ? " — " + lib : "");
     const badge = c.querySelector(".a-badge");
-    badge.textContent = id
-      ? (REF[id] ? id + " → " + REF[id].msa : id + " ⚠")
-      : "—";
-    badge.title = REF[id] && REF[id].libelle ? REF[id].libelle : "";
+    badge.textContent = id ? (REF[id] ? id + " → " + REF[id].msa : id + " ⚠") : "—";
+    badge.title = lib;
     const h = parseFloat(c.querySelector(".a-heures").value);
     if (!isNaN(h)) total += h;
   });
@@ -202,7 +209,7 @@ function refreshActs() {
   $("#act-total-h").textContent = total > 0 ? "Heures totales : " + fmt.format(total) + " h" : "";
 }
 
-/* ------------------ Recherche ------------------ */
+/* ═══════════════ Recherche collaborateur ═══════════════ */
 async function searchEmployee() {
   const mat = $("#matricule").value.trim(), box = $("#employee-result");
   if (!mat) { box.innerHTML = `<div class="alert warn">Veuillez saisir un matricule.</div>`; return; }
@@ -215,6 +222,7 @@ async function searchEmployee() {
     box.innerHTML = renderEmployee(j.data);
     if (j.data.hire_date) $("#hire-date").value = j.data.hire_date;
     if (j.data.site) $("#site").value = j.data.site;
+    // Pré-remplit l'ID de la 1re activité avec le projet ACTIF du collaborateur
     const first = $("#activites").querySelector(".act-card");
     if (first && !first.querySelector(".a-act").value && j.data.projet_code) {
       first.querySelector(".a-act").value = j.data.projet_code;
@@ -222,6 +230,7 @@ async function searchEmployee() {
     }
   } catch (e) { box.innerHTML = `<div class="alert error">Erreur réseau.</div>`; }
 }
+
 function renderEmployee(e) {
   const info = (label, value) => `
     <div class="emp-item"><span class="emp-label">${label}</span>
@@ -234,24 +243,35 @@ function renderEmployee(e) {
         <span class="badge ok">${esc(e.statut_wkd)}</span>
       </div>
       <div class="emp-grid">
-        ${info("Matricule WKD", e.matricule)}${info("N° paie", e.matricule_paie)}
-        ${info("Typo", e.typo)}${info("Site (payplan)", e.site)}
-        ${info("ID activité", e.projet_code)}${info("CPSA (code)", e.msa_code)}
-        ${info("Projet", e.projet)}${info("Date d'embauche", e.hire_date)}
+        ${info("Matricule WKD", e.matricule)}
+        ${info("Matricule paie", e.matricule_paie)}
+        ${info("Typo", e.typo)}
+        ${info("Site (payplan)", e.site)}
+        ${info("MSA", e.msa)}
+        ${info("Projet", e.projet)}
+        ${info("Date d'embauche", e.hire_date)}
+        ${info("Location", e.location)}
       </div>
     </div>`;
 }
 
-/* ------------------ Calcul ------------------ */
+/* ═══════════════ Calcul ═══════════════ */
 async function calculate() {
   const hireDate = $("#hire-date").value, site = $("#site").value;
   const referenceDate = $("#reference-date").value;
+  const baseHeures = parseFloat($("#base-heures").value);
+
+  // Validations globales
+  if (!hireDate) { toast("Date d'embauche manquante.", "error"); return; }
+  if (!baseHeures || baseHeures <= 0) { toast("Base d'heures manquante (ex : 176).", "error"); return; }
+
   const acts = [...$("#activites").children].map((c) => ({
     activity_id: c.querySelector(".a-act").value.trim().toUpperCase(),
     heures: parseFloat(c.querySelector(".a-heures").value),
     profiles: [".a-p1", ".a-p2", ".a-p3"].map((s) => c.querySelector(s).value),
   }));
-  if (!hireDate) { toast("Date d'embauche manquante.", "error"); return; }
+
+  // Validations par activité
   for (let i = 0; i < acts.length; i++) {
     const n = i + 1;
     if (!acts[i].activity_id) { toast(`Activité ${n} : ID d'activité manquant.`, "error"); return; }
@@ -259,6 +279,7 @@ async function calculate() {
     if (!acts[i].heures || acts[i].heures <= 0) { toast(`Activité ${n} : heures > 0 requises.`, "error"); return; }
     if (acts[i].profiles.some((p) => !p)) { toast(`Activité ${n} : 3 profils requis.`, "error"); return; }
   }
+
   const btn = $("#btn-calculate");
   btn.classList.add("loading"); btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Calcul…';
@@ -268,6 +289,7 @@ async function calculate() {
       body: JSON.stringify({
         matricule: employee ? employee.matricule : $("#matricule").value.trim(),
         hire_date: hireDate, site, reference_date: referenceDate || null,
+        base_heures: baseHeures,
         activites: acts }) });
     if (!j.ok) { toast(j.error, "error"); return; }
     renderResult(j.data);
@@ -277,15 +299,21 @@ async function calculate() {
             btn.innerHTML = "✨ Calculer ma prime"; }
 }
 
-/* ------------------ Résultat ------------------ */
+/* ═══════════════ Résultat ═══════════════ */
 function renderResult(d) {
   const card = $("#result-card");
   card.hidden = false;
   const acts = d.activites || [];
 
+  /* Barème en paliers : de [min] à [max] pts → montant ; le palier
+     contenant le total de points est surligné */
   const baremeChips = (a) => (a.bareme || []).slice().sort((x, y) => x.min - y.min)
-    .map((p) => `<span class="bchip ${a.total_points >= p.min && a.total_points <= p.max ? "hit" : ""}">
-       ${p.min === p.max ? p.min + " pt" : p.min + "–" + p.max + " pts"} → ${fmt.format(p.montant)} Ar</span>`).join("");
+    .map((p) => {
+      const hit = a.total_points >= p.min && a.total_points <= p.max;
+      const plage = p.min === p.max ? p.min + " pt" : p.min + "–" + p.max + " pts";
+      return `<span class="bchip ${hit ? "hit" : ""}">
+        ${plage} → ${fmt.format(p.montant)} Ar</span>`;
+    }).join("");
 
   const conditions = (a) => {
     const i = a.regle_infos || {}, parts = [];
@@ -293,17 +321,20 @@ function renderResult(d) {
     if (i.msa && i.msa.length) parts.push("CPSA : " + i.msa.join(", "));
     if (i.embauche_avant) parts.push("Embauche avant le " + i.embauche_avant);
     if (i.embauche_apres) parts.push("Embauche à partir du " + i.embauche_apres);
-    parts.push(`Ancienneté : ${i.anciennete_min != null ? i.anciennete_min : "?"}${i.anciennete_max != null ? " à " + i.anciennete_max : "+"} mois`);
+    parts.push(`Ancienneté : ${i.anciennete_min != null ? i.anciennete_min : "?"}` +
+               `${i.anciennete_max != null ? " à " + i.anciennete_max + " mois" : " mois et +"}`);
     return parts.join(" · ");
   };
 
   const isDegraded = (a) => (a.detail_points || [])
     .some((p) => p.note && p.note.includes("dégradation"));
 
+  const libelleOf = (id) => REF[id] && REF[id].libelle ? REF[id].libelle : "";
+
   const rows = acts.map((a) => `
     <tr class="${a.eligible ? "" : "off"}">
       <td><b>${esc(a.activity_id || "")}</b> → ${esc(a.msa)}
-          ${REF[a.activity_id] && REF[a.activity_id].libelle ? `<br/><span class="muted small">${esc(REF[a.activity_id].libelle)}</span>` : ""}</td>
+          ${libelleOf(a.activity_id) ? `<br/><span class="muted small">${esc(libelleOf(a.activity_id))}</span>` : ""}</td>
       <td class="center">${fmt.format(a.heures)} h</td>
       <td class="center">${a.part ?? 0}%</td>
       <td class="center"><b>${a.total_points}</b> pts${isDegraded(a) ? '<span class="deg-badge">⚠ dégradation</span>' : ""}</td>
@@ -320,10 +351,11 @@ function renderResult(d) {
         <p class="small"><b>Conditions :</b> ${esc(conditions(a))}</p>
         <p class="small"><b>Mois comptés (${a.nb_mois_profil}) :</b>
           ${(a.detail_points || []).filter((p) => p.pris_en_compte)
-            .map((p) => `${p.mois} : ${esc(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`).join(" · ")}</p>
+            .map((p) => `${p.mois} : ${esc(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`)
+            .join(" · ")}</p>
         <div class="bareme-row">${baremeChips(a)}</div>
-        ${a.eligible ? `<p class="small formula">Base ${fmt.format(a.montant)} Ar ×
-          (${fmt.format(a.heures)} h ÷ ${fmt.format(d.total_heures)} h) =
+        ${a.eligible ? `<p class="small formula">${fmt.format(a.montant)} Ar ×
+          (${fmt.format(a.heures)} h ÷ ${fmt.format(d.base_heures)} h) =
           <b>${fmt.format(a.montant_proratise)} Ar</b></p>` : ""}` : ""}
       </div>
     </details>`).join("");
@@ -336,17 +368,18 @@ function renderResult(d) {
       <div class="result-box">
         <span class="result-label">Activités calculées</span>
         <span class="result-value">${acts.filter((a) => a.eligible).length}<small>/${acts.length}</small></span>
-        <span class="result-sub">Heures totales : ${fmt.format(d.total_heures || 0)} h ·
-          Ancienneté : ${d.anciennete_affichee} mois</span>
+        <span class="result-sub">Heures : ${fmt.format(d.total_heures || 0)} h ·
+          Base : ${fmt.format(d.base_heures || 0)} h</span>
       </div>
       <div class="result-box highlight">
         <span class="result-label">Prime de régularité estimée</span>
         <span class="result-value gold" id="rv-amount">0</span>
-        <span class="result-sub">Prorata selon les heures par activité</span>
+        <span class="result-sub">Ancienneté : ${d.anciennete_affichee} mois ·
+          (base × heures) ÷ base d'heures</span>
       </div>
     </div>
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Activité (ID → CPSA)</th><th>Heures</th><th>Part</th><th>Points</th>
+      <thead><tr><th>Activité (ID → CPSA)</th><th>Heures</th><th>% base</th><th>Points</th>
         <th>Montant base</th><th>Montant proratisé</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <h3 class="pp-subtitle">Règles du payplan appliquées</h3>
@@ -355,7 +388,7 @@ function renderResult(d) {
   requestAnimationFrame(() => countUp($("#rv-amount"), d.montant_prime || 0, { suffix: " Ar" }));
 }
 
-/* ------------------ Mes simulations ------------------ */
+/* ═══════════════ Mes simulations ═══════════════ */
 async function loadMySims() {
   try {
     const j = await api("/api/simulations?scope=mine&limit=10");
@@ -372,6 +405,7 @@ async function loadMySims() {
       `<tr><td colspan="5" class="muted center">Aucune simulation pour le moment.</td></tr>`;
   } catch (e) {}
 }
+
 async function clearMySims() {
   if (!confirm("Supprimer toutes VOS simulations de cette session ?")) return;
   try {
