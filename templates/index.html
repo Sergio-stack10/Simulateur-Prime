@@ -13,36 +13,33 @@
   <div class="brand">
     <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo"/>
     <span>SimuPrime</span>
+    <span class="topbar-sub">Calculateur de prime de régularité</span>
   </div>
   <div class="topbar-actions">
-    {% if role == 'admin' %}<a class="btn btn-ghost btn-sm" href="/admin">⚙ Panneau admin</a>{% endif %}
+    {% if role == 'admin' %}<a class="btn btn-ghost btn-sm" href="/admin">⚙ Admin</a>{% endif %}
     <span class="badge-role">{{ 'ADMIN' if role == 'admin' else 'UTILISATEUR' }}</span>
     <button id="btn-logout" class="btn btn-ghost btn-sm">Déconnexion</button>
   </div>
 </nav>
 
 <main class="app-main">
+  <div class="layout-grid">
 
-  <section class="hero reveal" style="--d:0s">
-    <h1>Ma situation réelle</h1>
-    <p>Recherchez votre matricule, renseignez vos activités et profils,
-       puis découvrez votre prime estimée.</p>
-  </section>
+    <!-- ══════════ COLONNE GAUCHE ══════════ -->
+    <div class="col">
 
-  <!-- ===== 1. Identification ===== -->
-  <section class="card reveal" style="--d:.08s">
-    <h2><span class="chip">1</span> Identifier le collaborateur</h2>
-    <div class="search-bar">
-      <input id="matricule" type="text" autocomplete="off"
-             placeholder="Matricule WKD (ex : 102573627) ou n° de paie (W…)"/>
-      <button id="btn-search" class="btn btn-primary">🔍 Rechercher</button>
-    </div>
-    <div id="employee-result"></div>
-  </section>
+      <section class="card reveal" style="--d:.04s">
+        <h2><span class="chip">1</span> Identifier le collaborateur</h2>
+        <div class="search-bar">
+          <input id="matricule" type="text" autocomplete="off"
+                 placeholder="Matricule WKD (ex : 102573627) ou n° de paie (W…)"/>
+          <button id="btn-search" class="btn btn-primary" title="Rechercher">🔍</button>
+        </div>
+        <div id="employee-result"></div>
+      </section>
 
-  <!-- ===== 2. Paramètres ===== -->
-  <section class="card reveal" style="--d:.14s">
-    <h2><span class="chip">2</span> Paramètres</h2>
+      <section class="card reveal" style="--d:.1s">
+        <h2><span class="chip">2</span> Paramètres</h2>
         <div class="grid-3">
           <div class="field"><label for="hire-date">Date d'embauche *</label>
             <input id="hire-date" type="date"/></div>
@@ -56,25 +53,44 @@
               <option value="AUTRE">AUTRE</option>
             </select></div>
         </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- ===== 3. Activités ===== -->
-  <section class="card reveal" style="--d:.2s">
-    <h2><span class="chip">3</span> Activités du mois
-        <span class="muted small" id="act-count" style="margin-left:auto"></span></h2>
-    <p class="muted small">Une activité = un ID d'activité (le MSA s'affiche automatiquement)
-       + ses 3 profils (SI / F / L) + vos heures. Chaque activité a son montant base,
-       ensuite proratisé : base × (heures activité ÷ heures totales).</p>
-    <div id="activites"></div>
-    <div class="act-toolbar">
-      <button id="btn-add-act" class="btn btn-ghost">＋ Ajouter une activité</button>
-      <span class="muted small" id="act-total-h"></span>
-    </div>
-    <button id="btn-calculate" class="btn btn-primary btn-block btn-lg">✨ Calculer ma prime</button>
-  </section>
+      <section class="card reveal" style="--d:.16s">
+        <h2><span class="chip">⏱</span> Mes simulations
+          <span style="margin-left:auto;display:flex;gap:6px">
+            <button id="btn-refresh-sims" class="btn btn-ghost btn-sm" title="Actualiser">↻</button>
+            <button id="btn-clear-sims" class="btn btn-danger btn-sm" title="Supprimer mes simulations">🗑</button>
+          </span></h2>
+        <div class="table-wrap">
+          <table class="table table-compact">
+            <thead><tr><th>Date</th><th>Mat.</th><th>Site</th><th>Activités</th><th>Prime</th></tr></thead>
+            <tbody id="my-sims-body"></tbody>
+          </table>
+        </div>
+        <p class="muted small">Simulations propres à votre session.</p>
+      </section>
 
-  <!-- ===== 4. Résultat ===== -->
+    </div>
+
+    <!-- ══════════ COLONNE DROITE ══════════ -->
+    <div class="col">
+
+      <section class="card reveal" style="--d:.08s">
+        <h2><span class="chip">3</span> Activités du mois
+          <span class="muted small" id="act-count" style="margin-left:auto"></span></h2>
+        <p class="muted small">ID d'activité → CPSA automatique ·
+           Prime = Σ [ montant base × (heures activité ÷ heures totales) ].</p>
+        <div id="activites"></div>
+        <div class="act-toolbar">
+          <button id="btn-add-act" class="btn btn-ghost btn-sm">＋ Activité</button>
+          <span class="muted small" id="act-total-h"></span>
+        </div>
+        <div class="calc-row">
+          <button id="btn-calculate" class="btn btn-primary">✨ Calculer ma prime</button>
+          <button id="btn-reset" class="btn btn-ghost" title="Tout effacer pour une nouvelle simulation">🔄 Nouvelle simulation</button>
+        </div>
+      </section>
+
       <section class="card reveal" style="--d:.2s" id="result-card">
         <h2><span class="chip">4</span> Résultat de la simulation</h2>
         <div id="result-placeholder">
@@ -82,7 +98,7 @@
             <div class="ph-step"><b>1.</b> Recherchez le matricule du collaborateur</div>
             <div class="ph-step"><b>2.</b> Renseignez les ID d'activités et les heures</div>
             <div class="ph-step"><b>3.</b> Sélectionnez les profils des 3 derniers mois</div>
-            <div class="ph-step"><b>4.</b> Lancez le calcul — le détail du payplan appliqué s'affichera ici</div>
+            <div class="ph-step"><b>4.</b> Lancez le calcul — le détail du payplan s'affichera ici</div>
           </div>
           <div class="ph-profils" id="ph-profils"></div>
           <div class="ph-formule">
@@ -91,21 +107,9 @@
         </div>
       </section>
 
-  <!-- ===== Mes simulations ===== -->
-  <section class="card reveal" style="--d:.24s">
-    <h2><span class="chip">⏱</span> Mes simulations récentes
-      <button id="btn-refresh-sims" class="btn btn-ghost btn-sm" style="margin-left:auto">↻</button></h2>
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr><th>Date</th><th>Matricule</th><th>Site</th><th>Activités</th><th>Prime</th></tr>
-        </thead>
-        <tbody id="my-sims-body"></tbody>
-      </table>
     </div>
-    <p class="muted small">Ces simulations sont propres à votre session — personne d'autre ne les voit.</p>
-  </section>
 
+  </div>
 </main>
 
 <datalist id="act-list"></datalist>
