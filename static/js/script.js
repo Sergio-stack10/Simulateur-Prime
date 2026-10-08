@@ -248,7 +248,7 @@ function renderEmployee(e) {
         ${info("Typo", e.typo)}
         ${info("Site (payplan)", e.site)}
         ${info("MSA", e.msa)}
-        ${info("Projet", e.projet)}
+        ${info("Activité", e.projet)}
         ${info("Date d'embauche", e.hire_date)}
         ${info("Location", e.location)}
       </div>
