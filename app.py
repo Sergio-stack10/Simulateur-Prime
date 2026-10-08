@@ -318,6 +318,49 @@ def api_ref_msa_reset():
     return jsonify({"ok": True, "message": "Référentiel réinitialisé.",
                     "data": get_ref_msa()})
 
+@app.post("/api/ref-msa/upload")
+@admin_required
+def api_ref_msa_upload():
+    file = request.files.get("file")
+    if file is None or file.filename == "":
+        return jsonify({"ok": False, "error": "Aucun fichier reçu."}), 400
+    try:
+        df = pd.read_excel(file, sheet_name=0)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Fichier illisible : {exc}"}), 400
+
+    def norm(c):
+        return (str(c).strip().lower()
+                .replace("é", "e").replace("è", "e").replace("ê", "e")
+                .replace(" ", "").replace("-", "").replace("_", ""))
+    cols = {norm(c): c for c in df.columns}
+    def find(*cands):
+        for cand in cands:
+            if cand in cols:
+                return cols[cand]
+        return None
+
+    c_cpsa = find("cpsa", "msa")
+    c_act  = find("activites", "activite", "libelle", "libelleactivite")
+    c_id   = find("idactivite", "idactivites", "id", "activiteid")
+    if not (c_cpsa and c_act and c_id):
+        return jsonify({"ok": False, "error": "Colonnes attendues : CPSA · Activités · ID activité"}), 400
+
+    rows, seen = [], set()
+    for _, r in df.iterrows():
+        aid = _clean(r.get(c_id)).upper()
+        msa = _clean(r.get(c_cpsa)).upper()
+        lib = _clean(r.get(c_act))
+        if not aid or not msa or aid in seen:
+            continue
+        seen.add(aid)
+        rows.append({"id": aid, "msa": msa, "libelle": lib})
+    if not rows:
+        return jsonify({"ok": False, "error": "Aucune ligne valide (ID et CPSA requis)."}), 400
+    save_ref_msa(rows)
+    return jsonify({"ok": True, "message": f"Référentiel importé : {len(rows)} lignes.",
+                    "data": rows})
+
 # ---------------------------------------------------------------- Calculate
 @app.post("/api/calculate")
 @login_required
