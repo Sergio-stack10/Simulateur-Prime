@@ -52,7 +52,8 @@
   </section>
 
   <section class="card reveal" style="--d:.1s">
-    <h2><span class="chip">🔗</span> Référentiel Activités ↔ CPSA</h2>
+    <h2><span class="chip">🔗</span> 📥 Importer l'Excel du payplan (matrice)</button>
+Référentiel Activités ↔ MSA</h2>
     <div class="ref-import">
       <input type="file" id="file-ref" accept=".xlsx,.xls" hidden/>
       <button id="ref-import-btn" class="btn btn-ghost btn-sm">📥 Importer l'Excel du référentiel</button>
@@ -60,7 +61,7 @@
     </div>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th style="width:140px">ID activité</th><th style="width:140px">CPSA</th>
+        <thead><tr><th style="width:140px">ID activité</th><th style="width:140px">MSA</th>
           <th>Libellé de l'activité</th><th style="width:50px"></th></tr></thead>
         <tbody id="ref-body"></tbody>
       </table>
@@ -80,6 +81,7 @@
     <div class="ref-import">
       <input type="file" id="file-payplan" accept=".xlsx,.xls" hidden/>
       <button id="pp-import-btn" class="btn btn-primary btn-sm">📥 Importer l'Excel du payplan (matrice)</button>
+      <a class="btn btn-ghost btn-sm" href="/api/payplan/template">📄 Télécharger le modèle</a>
       <span id="pp-import-status" class="muted small"></span>
     </div>
     <div class="alert warn" id="pp-warning" hidden></div>
