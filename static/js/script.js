@@ -1,13 +1,16 @@
 /* ============================================================
-   SimuPrime v4 — Activités par ID → MSA auto · SI/F/L · prorata
+   SimuPrime v6 — script.js COMPLET
+   ID activité → CPSA · profils L/F/SI · base + prorata · détail payplan
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
-const REF = {};                 // { "W0ZQPJ": {msa, libelle} }
+const REF = {};                 // { "W0ZRVV": {msa, libelle} }
+const PROFILE_LABELS = { "L": "Leader", "F": "Fragile", "SI": "Soutien Intense" };
 let employee = null;
 const MAX_ACT = 7;
 
+/* ---------------- Utilitaires ---------------- */
 function esc(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -35,6 +38,7 @@ function countUp(el, target, { dur = 900, suffix = "" } = {}) {
   })(t0);
 }
 
+/* ---------------- Initialisation ---------------- */
 document.addEventListener("DOMContentLoaded", async () => {
   $("#btn-search").onclick = searchEmployee;
   $("#matricule").addEventListener("keydown", (e) => { if (e.key === "Enter") searchEmployee(); });
@@ -42,7 +46,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("#btn-logout").onclick = logout;
   $("#btn-refresh-sims").onclick = loadMySims;
   $("#btn-add-act").onclick = () => addActivity();
-  $("#btn-eom").onclick = () => { endOfMonth(); toast("Date de référence : fin du mois courant."); };
+  const eomBtn = $("#btn-eom");
+  if (eomBtn) eomBtn.onclick = () => { endOfMonth(); toast("Date de référence : fin du mois courant."); };
   endOfMonth();
   await loadPayplan();
   await loadRef();
@@ -64,23 +69,27 @@ async function loadPayplan() {
     const j = await api("/api/payplan");
     if (!j.ok) return;
     PP.profils = j.profils; PP.regles = j.regles;
+    const ph = $("#ph-profils");
+    if (ph) ph.innerHTML = Object.entries(j.profils).map(([c, p]) =>
+      `<span class="bchip">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
   } catch (e) { console.error(e); }
 }
 async function loadRef() {
   try {
     const j = await api("/api/ref-msa");
     if (!j.ok) return;
-    const dl = $("#act-list"); dl.innerHTML = "";
+    const dl = $("#act-list");
+    if (dl) dl.innerHTML = "";
     (j.data || []).forEach((r) => {
       REF[r.id] = { msa: r.msa, libelle: r.libelle || "" };
-      const o = document.createElement("option");
-      o.value = r.id; o.label = r.msa;
-      dl.appendChild(o);
+      if (dl) {
+        const o = document.createElement("option");
+        o.value = r.id; o.label = r.msa;
+        dl.appendChild(o);
+      }
     });
   } catch (e) { console.error(e); }
 }
-const PROFILE_LABELS = { "L": "Leader", "F": "Fragile", "SI": "Soutien Intense" };
-
 function profileOptionsHTML() {
   return `<option value="" disabled selected>Sélectionner…</option>` +
     Object.entries(PP.profils).map(([code, pts]) => {
@@ -107,7 +116,7 @@ function addActivity(activityId = "") {
       <div class="grid-act">
         <div class="field">
           <label>ID de l'activité *</label>
-          <input class="a-act" list="act-list" placeholder="ex : W0ZQPJ" value="${esc(activityId)}"/>
+          <input class="a-act" list="act-list" placeholder="ex : W0ZRVV" value="${esc(activityId)}"/>
           <span class="msa-resolved" hidden><span class="dot"></span><span class="txt"></span></span>
         </div>
         <div class="field"><label>Heures sur l'activité *</label>
@@ -129,7 +138,7 @@ function addActivity(activityId = "") {
     else if (REF[v]) {
       box.hidden = false; box.classList.remove("unknown");
       box.querySelector(".txt").textContent =
-        "MSA : " + REF[v].msa + (REF[v].libelle ? " · " + REF[v].libelle : "");
+        "CPSA : " + REF[v].msa + (REF[v].libelle ? " · " + REF[v].libelle : "");
     } else {
       box.hidden = false; box.classList.add("unknown");
       box.querySelector(".txt").textContent = "ID inconnu — vérifiez le référentiel (Admin)";
@@ -158,7 +167,10 @@ function refreshActs() {
     c.querySelector(".act-title").textContent = "Activité " + (i + 1);
     const id = c.querySelector(".a-act").value.trim().toUpperCase();
     const badge = c.querySelector(".a-badge");
-    badge.textContent = id ? (REF[id] ? id + " → " + REF[id].msa : id + " ⚠") : "—";
+    badge.textContent = id
+      ? (REF[id] ? id + " → " + REF[id].msa : id + " ⚠")
+      : "—";
+    badge.title = REF[id] && REF[id].libelle ? REF[id].libelle : "";
     const h = parseFloat(c.querySelector(".a-heures").value);
     if (!isNaN(h)) total += h;
   });
@@ -200,7 +212,7 @@ function renderEmployee(e) {
       <div class="emp-grid">
         ${info("Matricule WKD", e.matricule)}${info("N° paie", e.matricule_paie)}
         ${info("Typo", e.typo)}${info("Site (payplan)", e.site)}
-        ${info("ID activité", e.projet_code)}${info("MSA (code)", e.msa_code)}
+        ${info("ID activité", e.projet_code)}${info("CPSA (code)", e.msa_code)}
         ${info("Projet", e.projet)}${info("Date d'embauche", e.hire_date)}
       </div>
     </div>`;
@@ -241,19 +253,54 @@ async function calculate() {
             btn.innerHTML = "✨ Calculer ma prime"; }
 }
 
+/* ------------------ Résultat (v6 : + détail payplan) ------------------ */
 function renderResult(d) {
-  const card = $("#result-card"); card.hidden = false;
+  const card = $("#result-card");
+  card.hidden = false;
   const acts = d.activites || [];
+
+  const baremeChips = (a) => Object.entries(a.bareme || {}).sort((x, y) => x[0] - y[0])
+    .map(([p, m]) => `<span class="bchip ${+p === a.total_points ? "hit" : ""}">
+       ${p} pt → ${fmt.format(m)} Ar</span>`).join("");
+
+  const conditions = (a) => {
+    const i = a.regle_infos || {}, parts = [];
+    if (i.sites && i.sites.length) parts.push("Site : " + i.sites.join(", "));
+    if (i.msa && i.msa.length) parts.push("CPSA : " + i.msa.join(", "));
+    if (i.embauche_avant) parts.push("Embauche avant le " + i.embauche_avant);
+    if (i.embauche_apres) parts.push("Embauche à partir du " + i.embauche_apres);
+    parts.push(`Ancienneté : ${i.anciennete_min != null ? i.anciennete_min : "?"}${i.anciennete_max != null ? " à " + i.anciennete_max : "+"} mois`);
+    return parts.join(" · ");
+  };
+
   const rows = acts.map((a) => `
     <tr class="${a.eligible ? "" : "off"}">
-      <td><b>${esc(a.activity_id || a.msa)}</b> → ${esc(a.msa)}<br/>
-          <span class="muted small">${esc(a.regle || a.explication || "—")}</span></td>
+      <td><b>${esc(a.activity_id || "")}</b> → ${esc(a.msa)}
+          ${REF[a.activity_id] && REF[a.activity_id].libelle ? `<br/><span class="muted small">${esc(REF[a.activity_id].libelle)}</span>` : ""}</td>
       <td class="center">${fmt.format(a.heures)} h</td>
       <td class="center">${a.part ?? 0}%</td>
       <td class="center"><b>${a.total_points}</b> pts</td>
       <td>${a.eligible ? fmt.format(a.montant) + " Ar" : "—"}</td>
       <td><b>${fmt.format(a.montant_proratise || 0)} Ar</b></td>
     </tr>`).join("");
+
+  const details = acts.map((a, idx) => `
+    <details class="rule-detail" ${idx === 0 ? "open" : ""}>
+      <summary>${esc(a.activity_id || "")} — ${esc(a.msa)} ·
+        <span class="muted">${esc(a.regle || "aucune règle")}</span></summary>
+      <div class="rd-body">
+        ${a.regle ? `
+        <p class="small"><b>Conditions :</b> ${esc(conditions(a))}</p>
+        <p class="small"><b>Mois comptés (${a.nb_mois_profil}) :</b>
+          ${(a.detail_points || []).filter((p) => p.pris_en_compte)
+            .map((p) => `${p.mois} : ${esc(p.profil)} (${p.note ? esc(p.note) : (p.points === null ? "vide" : p.points + " pt")})`).join(" · ")}</p>
+        <div class="bareme-row">${baremeChips(a)}</div>
+        ${a.eligible ? `<p class="small formula">Base ${fmt.format(a.montant)} Ar ×
+          (${fmt.format(a.heures)} h ÷ ${fmt.format(d.total_heures)} h) =
+          <b>${fmt.format(a.montant_proratise)} Ar</b></p>` : ""}` : ""}
+      </div>
+    </details>`).join("");
+
   card.innerHTML = `
     <h2><span class="chip">4</span> Résultat de la simulation</h2>
     ${d.explication && !d.eligible ? `<div class="alert warn">${esc(d.explication)}</div>` : ""}
@@ -261,28 +308,26 @@ function renderResult(d) {
       <div class="result-box">
         <span class="result-label">Activités calculées</span>
         <span class="result-value">${acts.filter((a) => a.eligible).length}<small>/${acts.length}</small></span>
-        <span class="result-sub">Heures totales : ${fmt.format(d.total_heures || 0)} h</span>
+        <span class="result-sub">Heures totales : ${fmt.format(d.total_heures || 0)} h ·
+          Ancienneté : ${d.anciennete_affichee} mois</span>
       </div>
       <div class="result-box highlight">
         <span class="result-label">Prime de régularité estimée</span>
         <span class="result-value gold" id="rv-amount">0</span>
-        <span class="result-sub">Ancienneté : ${d.anciennete_affichee} mois</span>
+        <span class="result-sub">Prorata selon les heures par activité</span>
       </div>
     </div>
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Activité (ID → MSA)</th><th>Heures</th><th>Part</th><th>Points</th>
+      <thead><tr><th>Activité (ID → CPSA)</th><th>Heures</th><th>Part</th><th>Points</th>
         <th>Montant base</th><th>Montant proratisé</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-    <details class="calc-details"><summary>Formule de proratisation</summary>
-      <p class="muted small">Prime finale = Σ [ Montant base de l'activité ×
-      (heures de l'activité ÷ ${fmt.format(d.total_heures || 0)} h) ].<br/>
-      Exemple : base ${acts[0] && acts[0].montant ? fmt.format(acts[0].montant) + " Ar" : "…"} ×
-      (${acts[0] ? fmt.format(acts[0].heures) : "…"} h ÷ ${fmt.format(d.total_heures || 0)} h)
-      = ${acts[0] ? fmt.format(acts[0].montant_proratise || 0) + " Ar" : "…"}</p></details>`;
-  card.scrollIntoView({ behavior: "smooth", block: "start" });
+    <h3 class="pp-subtitle">Règles du payplan appliquées</h3>
+    ${details}`;
+  card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   requestAnimationFrame(() => countUp($("#rv-amount"), d.montant_prime || 0, { suffix: " Ar" }));
 }
 
+/* ------------------ Mes simulations ------------------ */
 async function loadMySims() {
   try {
     const j = await api("/api/simulations?scope=mine&limit=10");
