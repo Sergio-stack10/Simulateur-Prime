@@ -646,6 +646,52 @@ def api_payplan_upload():
     return jsonify({"ok": True, "message": f"Payplan importé : {len(regles_valid)} règles.",
                     "profils": profils, "regles": regles_valid})
 
+@app.get("/api/payplan/template")
+@admin_required
+def api_payplan_template():
+    """Génère le modèle Excel du payplan (14 règles pré-remplies, montants à compléter)."""
+    import io
+    from flask import send_file
+
+    PIVOT = "01/06/2023"
+    L1 = "WHFR1135,WHFR919"
+    L2 = ("WHFR919,WHFR1006,WHFR1039,WHFR1154,WHFR1171,WHFR218,"
+          "WHFR2749,WHFR594,WHFR907,WHFR977,WHFR1265")
+    P2 = [(0, 2), (3, 4), (5, 6)]              # règles à 2 mois comptés
+    P3 = [(0, 2), (3, 4), (5, 6), (7, 9)]      # règles à 3 mois comptés
+
+    rows = []
+    def add(avant, site, msa, amin, amax, paliers, index):
+        for pmin, pmax in paliers:
+            rows.append({"Date": PIVOT,
+                         "Avant": PIVOT if avant else "",
+                         "Après": "" if avant else PIVOT,
+                         "Site": site, "MSA": msa,
+                         "Anc_min": amin, "Anc_max": "" if amax is None else amax,
+                         "Pts_min": pmin, "Pts_max": pmax,
+                         "Montant": 0, "Index": index})
+
+    add(True,  "ANTA", L1, 4, None, P3, 1)    # Liste 1 : WHFR1135 & WHFR919
+    add(True,  "ANTA", L2, 4, None, P3, 2)    # Liste 2 : 11 projets
+    add(True,  "TMM", "", 4, 6, P2, 10)       # TMM · Avant · 4-6 mois
+    add(True,  "TMM", "", 7, 18, P3, 11)      # TMM · Avant · 7-18 mois
+    add(True,  "TMM", "", 19, None, P3, 12)   # TMM · Avant · 19 mois et +
+    add(True,  "ANTA", "", 4, 6, P2, 20)      # ANTA · Avant · 4-6 mois
+    add(True,  "ANTA", "", 7, 18, P3, 21)     # ANTA · Avant · 7-18 mois
+    add(True,  "ANTA", "", 19, None, P3, 22)  # ANTA · Avant · 19 mois et +
+    add(False, "TMM", "", 4, 6, P2, 40)       # TMM · Après · 4-6 mois
+    add(False, "TMM", "", 7, 18, P3, 41)      # TMM · Après · 7-18 mois
+    add(False, "TMM", "", 19, None, P3, 42)   # TMM · Après · 19 mois et +
+    add(False, "ANTA", "", 4, 6, P2, 50)      # ANTA · Après · 4-6 mois
+    add(False, "ANTA", "", 7, 18, P3, 51)     # ANTA · Après · 7-18 mois
+    add(False, "ANTA", "", 19, None, P3, 52)  # ANTA · Après · 19 mois et +
+
+    buf = io.BytesIO()
+    pd.DataFrame(rows).to_excel(buf, index=False, engine="openpyxl")
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name="payplan_modele.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
 
 # -------------------------------------------------------------------- Stats
 @app.get("/api/stats")
