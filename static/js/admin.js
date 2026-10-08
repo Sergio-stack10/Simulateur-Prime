@@ -197,7 +197,8 @@ function ruleCard(r) {
   const div = document.createElement("div"); div.className = "rule-card";
   const sites = Array.isArray(r.sites) ? r.sites.join(",") : (r.sites || "");
   const msa = Array.isArray(r.msa) ? r.msa.join(",") : (r.msa || "");
-  const monts = Object.entries(r.montants || {}).sort((a, b) => a[0] - b[0]);
+  const monts = (Array.isArray(r.montants) ? r.montants : [])
+    .slice().sort((a, b) => (a.min || 0) - (b.min || 0));
   div.innerHTML = `
     <div class="rule-head">
       <span class="rule-idx" title="Priorité : plus petit = appliqué en premier (après les règles CPSA)">
@@ -235,9 +236,10 @@ function ruleCard(r) {
   const addM = (k, v) => {
     const row = document.createElement("div"); row.className = "m-row";
     row.innerHTML = `
-      <input class="m-key" type="number" min="0" placeholder="Points" value="${k ?? ""}"/> pt →
-      <input class="m-val" type="number" min="0" placeholder="Montant" value="${v ?? ""}"/> Ar
-      <button class="btn btn-danger btn-sm" title="Supprimer la ligne">✕</button>`;
+      <input class="m-min" type="number" min="0" placeholder="de" value="${k?.min ?? ""}"/>
+      à <input class="m-max" type="number" min="0" placeholder="à" value="${k?.max ?? ""}"/> pts →
+      <input class="m-val" type="number" min="0" placeholder="Montant" value="${k?.montant ?? ""}"/> Ar
+      <button class="btn btn-danger btn-sm" title="Supprimer">✕</button>`;
     row.querySelector("button").onclick = () => row.remove();
     mcont.appendChild(row);
   };
@@ -271,11 +273,12 @@ async function savePayplan() {
   const regles = [];
   for (const div of document.querySelectorAll("#pp-rules .rule-card")) {
     const nom = div.querySelector(".r-nom").value.trim() || "Règle";
-    const montants = {};
+    const montants = [];
     for (const row of div.querySelectorAll(".m-row")) {
-      const k = parseInt(row.querySelector(".m-key").value);
+      const mn = parseInt(row.querySelector(".m-min").value);
+      const mx = parseInt(row.querySelector(".m-max").value);
       const v = parseInt(row.querySelector(".m-val").value);
-      if (!isNaN(k) && !isNaN(v)) montants[k] = v;
+      if (!isNaN(mn) && !isNaN(mx) && !isNaN(v)) montants.push({ min: mn, max: mx, montant: v });
     }
     if (!Object.keys(montants).length) {
       toast("La règle « " + nom + " » n'a aucun montant.", "error"); return; }
