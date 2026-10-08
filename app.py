@@ -279,10 +279,21 @@ def api_employee(matricule: str):
     if not e:
         return jsonify({"ok": False, "error": f"Matricule « {matricule} » introuvable "
                         "dans l'extraction ACTIF."}), 404
-    e.pop("_id", None)
-    e.setdefault("msa_code", extract_msa_code(e.get("msa")))
-    e.setdefault("projet_code", extract_activity_code(e.get("projet")))
-    return jsonify({"ok": True, "data": e})
+    return jsonify({"ok": True, "data": {
+        "matricule": e.get("mat_wkd", ""),
+        "matricule_paie": e.get("mat_paie", ""),
+        "nom": e.get("nom", ""),
+        "poste": e.get("poste", ""),
+        "typo": e.get("typo", ""),
+        "site": e.get("site", ""),
+        "location": e.get("location", ""),
+        "msa": e.get("msa", ""),
+        "projet": e.get("projet", ""),
+        "msa_code": e.get("msa_code", ""),
+        "projet_code": e.get("projet_code", ""),
+        "statut_wkd": e.get("statut_wkd", "ACTIVE"),
+        "hire_date": e.get("hire_date"),
+    }})
 
 @app.get("/api/ref-msa")
 @login_required
@@ -380,6 +391,12 @@ def api_calculate():
         return jsonify({"ok": False, "error": "Date d'embauche invalide."}), 400
     if not site:
         return jsonify({"ok": False, "error": "Le site est obligatoire."}), 400
+    try:
+        base_heures = float(p.get("base_heures") or 0)
+    except (TypeError, ValueError):
+        base_heures = 0.0
+    if base_heures <= 0:
+        return jsonify({"ok": False, "error": "La base d'heures est obligatoire (ex : 176)."}), 400
     if not isinstance(activites, list) or not 1 <= len(activites) <= 7:
         return jsonify({"ok": False, "error": "Renseignez entre 1 et 7 activités."}), 400
     try:
@@ -410,7 +427,8 @@ def api_calculate():
         clean.append({"activity_id": activity_id, "msa": msa,
                       "heures": heures, "profiles": profiles})
 
-    result = calculate_prime(hire_date, site, clean, reference_date, profils, regles)
+    result = calculate_prime(hire_date, site, clean, reference_date,
+                             profils, regles, base_heures=base_heures)
 
     u = current_user()
     matricule = str(p.get("matricule") or "").strip()
