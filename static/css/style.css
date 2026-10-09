@@ -382,4 +382,12 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
 .help-note{background:#f6f9fd;border:1px dashed var(--border);border-radius:10px;
   padding:10px 12px;font-size:.82rem;color:var(--muted);margin-top:4px}
 .modal-body .pchip{margin:2px 2px}
+
+/* ═══════════ Page d'aide ═══════════ */
+.aide-main{max-width:880px;margin:16px auto 40px;padding:0 14px;
+  display:flex;flex-direction:column;gap:12px}
+.aide-main .help-step{font-size:.9rem}
+.aide-main code{background:#f1f5fa;border:1px solid var(--border);border-radius:5px;
+  padding:1px 6px;font-size:.82rem}
+.aide-main .pchip{margin:2px 2px}
 }
