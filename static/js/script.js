@@ -1,7 +1,7 @@
 /* ============================================================
-   SimuPrime v12.2 — script.js COMPLET
-   Mois de référence · base d'heures auto · Care/Challenger ·
-   code couleur profils · placeholders restaurés
+   SimuPrime v12.3 — script.js COMPLET
+   Mois de référence · base d'heures auto · prorata base d'heures ·
+   Code couleur profils (inline + classes + délégation globale)
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
@@ -11,26 +11,67 @@ let employee = null;
 const MAX_ACT = 7;
 let placeholderResult = "", placeholderRules = "";
 
-/* 🎨 Code couleur — couvre tous les noms (actuels + historiques BDD) */
-const PROFILE_CLASSES = {
-  "Leader": "pc-green", "Challenger": "pc-green", "L": "pc-green",
-  "Fragile": "pc-orange", "F": "pc-orange",
-  "Care": "pc-red", "Soutien Intense": "pc-red", "SI": "pc-red",
-  "Non évalué": "pc-gray",
+/* ═══════════ 🎨 CODE COULEUR DES PROFILS ═══════════ */
+const COLOR_STYLES = {
+  green:  { bg: "#f0fdf4", border: "#16a34a", fg: "#14532d" },   // Leader, Challenger
+  orange: { bg: "#fffbeb", border: "#e08c0d", fg: "#7c4a03" },   // Fragile
+  red:    { bg: "#fef2f2", border: "#dc2626", fg: "#7f1d1d" },   // Care
+  gray:   { bg: "#f1f5f9", border: "#94a3b8", fg: "#64748b" },   // Non évalué
 };
+
+/* Couleur d'un profil :
+   1) par ses POINTS dans le payplan (3+→vert · 1→orange · 0→rouge · vide→gris)
+   2) par son NOM en fallback (alias historiques inclus) */
+function colorForProfile(name) {
+  if (!name) return null;
+  const pts = PP.profils[name];
+  if (pts !== undefined) {
+    if (pts === null || pts === undefined) return "gray";
+    if (pts === 0) return "red";
+    if (pts === 1) return "orange";
+    if (pts >= 2) return "green";
+  }
+  const n = String(name).trim().toLowerCase().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (/(leader|challeng|^l$)/.test(n)) return "green";
+  if (/(fragile|^f$)/.test(n)) return "orange";
+  if (/(care|soutien|^si$)/.test(n)) return "red";
+  if (/(non|evalue|vide)/.test(n)) return "gray";
+  return null;
+}
+
+/* Peint UN select : styles inline (priorité maximale) + classe de renfort.
+   Colore aussi le libellé du mois au-dessus. */
+function paintSelect(sel) {
+  const c = colorForProfile(sel.value);
+  sel.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
+  const monthEl = sel.closest(".profile-cell")?.querySelector(".p-month");
+  if (!c) {
+    sel.style.background = ""; sel.style.borderColor = "";
+    sel.style.color = ""; sel.style.fontWeight = "";
+    if (monthEl) monthEl.style.color = "";
+    return;
+  }
+  const s = COLOR_STYLES[c];
+  sel.style.background = s.bg;
+  sel.style.borderColor = s.border;
+  sel.style.color = s.fg;
+  sel.style.fontWeight = "700";
+  sel.classList.add("pc-" + c);
+  if (monthEl) monthEl.style.color = s.border;
+}
+
 function colorProfiles(cardEl) {
   (cardEl ? [cardEl] : document.querySelectorAll(".act-card")).forEach((card) => {
-    card.querySelectorAll("select.profile").forEach((sel) => {
-      sel.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
-      const cls = PROFILE_CLASSES[sel.value];
-      if (cls) sel.classList.add(cls);
-    });
+    card.querySelectorAll("select.profile").forEach(paintSelect);
   });
 }
+
 function profilBadgeHTML(name) {
-  const cls = PROFILE_CLASSES[name];
-  return cls ? `<span class="pchip ${cls}">${esc(name)}</span>` : `<b>${esc(name)}</b>`;
+  const c = colorForProfile(name);
+  return c ? `<span class="pchip pc-${c}">${esc(name)}</span>` : `<b>${esc(name)}</b>`;
 }
+/* ═══════════ fin code couleur ═══════════ */
 
 const MOIS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet",
                  "Août","Septembre","Octobre","Novembre","Décembre"];
@@ -108,8 +149,21 @@ function onRefMonthChange() { updateBaseHeures(); updateMonthLabels(); }
 
 /* ═══════════════ Initialisation ═══════════════ */
 document.addEventListener("DOMContentLoaded", async () => {
-  placeholderResult = $("#result-card").innerHTML;   // mémorise l'écran d'attente
+  placeholderResult = $("#result-card").innerHTML;
   placeholderRules = $("#rules-card").innerHTML;
+
+  /* 🎨 DÉLÉGATION GLOBALE : tout changement de select profil (présent ou
+     futur, quelle que soit l'activité) repeint la couleur immédiatement. */
+  document.addEventListener("change", (e) => {
+    if (e.target && e.target.matches && e.target.matches("select.profile")) {
+      paintSelect(e.target);
+    }
+  });
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.matches && e.target.matches("select.profile")) {
+      paintSelect(e.target);
+    }
+  });
 
   const now = new Date();
   const ms = $("#ref-month");
@@ -168,8 +222,11 @@ function resetAll() {
 function fillPhProfils() {
   const ph = $("#ph-profils");
   if (!ph) return;
-  ph.innerHTML = Object.entries(PP.profils).map(([c, p]) =>
-    `<span class="pchip ${PROFILE_CLASSES[c] || "pc-gray"}">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
+  ph.innerHTML = Object.entries(PP.profils).map(([c, p]) => {
+    const col = colorForProfile(c);
+    const cls = col ? "pc-" + col : "pc-gray";
+    return `<span class="pchip ${cls}">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`;
+  }).join("");
 }
 async function logout() {
   try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {}
@@ -200,10 +257,15 @@ async function loadRef() {
   } catch (e) { console.error(e); }
 }
 function profileOptionsHTML() {
+  /* Options colorées : le dropdown ouvert montre aussi les couleurs */
   return `<option value="" disabled selected>Sélectionner…</option>` +
     Object.entries(PP.profils).map(([code, pts]) => {
       const val = (pts === null || pts === undefined) ? "vide" : pts + " pt";
-      return `<option value="${esc(code)}">${esc(code)} · ${val}</option>`;
+      const c = colorForProfile(code);
+      const style = c
+        ? ` style="background:${COLOR_STYLES[c].bg};color:${COLOR_STYLES[c].fg};font-weight:700"`
+        : "";
+      return `<option value="${esc(code)}"${style}>${esc(code)} · ${val}</option>`;
     }).join("");
 }
 
@@ -269,14 +331,10 @@ function addActivity(activityId = "") {
   };
   div.querySelector(".a-heures").addEventListener("input", refreshActs);
 
-  /* 🎨 Couleur : appliquée à la création + à chaque changement de profil */
-  div.querySelectorAll(".profile-row select").forEach((sel) =>
-    sel.addEventListener("change", () => colorProfiles(div)));
-
   cont.appendChild(div);
   resolve();
   updateMonthLabels();
-  colorProfiles(div);
+  colorProfiles(div);   // peint l'état initial (neutre si rien de sélectionné)
 }
 
 function refreshActs() {
