@@ -336,4 +336,31 @@ body.login-page{min-height:100vh;display:flex;align-items:center;justify-content
 .pchip.pc-orange{background:#fffbeb;color:#b45309;border-color:#fcd34d}
 .pchip.pc-red{background:#fef2f2;color:#b91c1c;border-color:#fca5a5}
 .pchip.pc-gray{background:#f1f5f9;color:#64748b;border-color:#cbd5e1}
+
+/* ═══════════ Couleur DIRECTEMENT sur les selects de profil ═══════════ */
+/* Mécanisme 1 : classes posées par le JS sur le select lui-même */
+select.profile.pc-green{border-color:#16a34a!important;background:#f0fdf4!important;
+  color:#14532d!important;font-weight:700}
+select.profile.pc-orange{border-color:#e08c0d!important;background:#fffbeb!important;
+  color:#7c4a03!important;font-weight:700}
+select.profile.pc-red{border-color:#dc2626!important;background:#fef2f2!important;
+  color:#7f1d1d!important;font-weight:700}
+select.profile.pc-gray{border-color:#94a3b8!important;background:#f1f5f9!important;
+  color:#64748b!important;font-weight:700}
+
+/* Mécanisme 2 : CSS pur — colore dès la sélection, sans aucun JS.
+   Couvre les noms actuels ET historiques (L/F/SI) */
+select.profile:has(option[value="Leader"]:checked),
+select.profile:has(option[value="Challenger"]:checked),
+select.profile:has(option[value="L"]:checked){border-color:#16a34a!important;
+  background:#f0fdf4!important;color:#14532d!important;font-weight:700}
+select.profile:has(option[value="Fragile"]:checked),
+select.profile:has(option[value="F"]:checked){border-color:#e08c0d!important;
+  background:#fffbeb!important;color:#7c4a03!important;font-weight:700}
+select.profile:has(option[value="Care"]:checked),
+select.profile:has(option[value="Soutien Intense"]:checked),
+select.profile:has(option[value="SI"]:checked){border-color:#dc2626!important;
+  background:#fef2f2!important;color:#7f1d1d!important;font-weight:700}
+select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8!important;
+  background:#f1f5f9!important;color:#64748b!important;font-weight:700}
 }
