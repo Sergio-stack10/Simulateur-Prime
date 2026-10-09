@@ -1,27 +1,25 @@
 /* ============================================================
-   SimuPrime v12.3 — script.js COMPLET
-   Mois de référence · base d'heures auto · prorata base d'heures ·
-   Code couleur profils (inline + classes + délégation globale)
+   SimuPrime v13 — script.js COMPLET
+   Mois de PAIE (M+1) · perf = paie - 1 · heures 0 autorisées ·
+   dropdown activités filtré par MSA · couleurs profils
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
-const REF = {};                 // { "W0ZRVV": {msa, libelle} }
+const REF = {};                    // { "W0ZRVV": {msa, libelle} }
+let ALL_REF_ROWS = [];             // référentiel complet
+const REF_BY_MSA = {};             // { "WHFR1006": [rows...] }
 let employee = null;
 const MAX_ACT = 7;
 let placeholderResult = "", placeholderRules = "";
 
 /* ═══════════ 🎨 CODE COULEUR DES PROFILS ═══════════ */
 const COLOR_STYLES = {
-  green:  { bg: "#f0fdf4", border: "#16a34a", fg: "#14532d" },   // Leader, Challenger
-  orange: { bg: "#fffbeb", border: "#e08c0d", fg: "#7c4a03" },   // Fragile
-  red:    { bg: "#fef2f2", border: "#dc2626", fg: "#7f1d1d" },   // Care
-  gray:   { bg: "#f1f5f9", border: "#94a3b8", fg: "#64748b" },   // Non évalué
+  green:  { bg: "#f0fdf4", border: "#16a34a", fg: "#14532d" },
+  orange: { bg: "#fffbeb", border: "#e08c0d", fg: "#7c4a03" },
+  red:    { bg: "#fef2f2", border: "#dc2626", fg: "#7f1d1d" },
+  gray:   { bg: "#f1f5f9", border: "#94a3b8", fg: "#64748b" },
 };
-
-/* Couleur d'un profil :
-   1) par ses POINTS dans le payplan (3+→vert · 1→orange · 0→rouge · vide→gris)
-   2) par son NOM en fallback (alias historiques inclus) */
 function colorForProfile(name) {
   if (!name) return null;
   const pts = PP.profils[name];
@@ -39,9 +37,6 @@ function colorForProfile(name) {
   if (/(non|evalue|vide)/.test(n)) return "gray";
   return null;
 }
-
-/* Peint UN select : styles inline (priorité maximale) + classe de renfort.
-   Colore aussi le libellé du mois au-dessus. */
 function paintSelect(sel) {
   const c = colorForProfile(sel.value);
   sel.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
@@ -60,18 +55,23 @@ function paintSelect(sel) {
   sel.classList.add("pc-" + c);
   if (monthEl) monthEl.style.color = s.border;
 }
-
 function colorProfiles(cardEl) {
   (cardEl ? [cardEl] : document.querySelectorAll(".act-card")).forEach((card) => {
     card.querySelectorAll("select.profile").forEach(paintSelect);
   });
 }
-
 function profilBadgeHTML(name) {
   const c = colorForProfile(name);
   return c ? `<span class="pchip pc-${c}">${esc(name)}</span>` : `<b>${esc(name)}</b>`;
 }
-/* ═══════════ fin code couleur ═══════════ */
+/* Ordre d'affichage des profils */
+const PROFILE_ORDER = ["Non évalué", "Care", "Fragile", "Challenger", "Leader"];
+function orderedProfiles() {
+  const keys = Object.keys(PP.profils);
+  const known = PROFILE_ORDER.filter((k) => keys.includes(k));
+  const rest = keys.filter((k) => !PROFILE_ORDER.includes(k));
+  return [...known, ...rest];
+}
 
 const MOIS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet",
                  "Août","Septembre","Octobre","Novembre","Décembre"];
@@ -110,17 +110,25 @@ function iso(y, m, d) {
   return y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
 }
 
-/* ═══════════════ Mois de référence ═══════════════ */
-function refMonthDate() {
+/* ═══════════════ Mois de PAIE → mois de PERFORMANCE = paie − 1 ═══════════════ */
+function paieMonthDate() {
   return new Date(parseInt($("#ref-year").value), parseInt($("#ref-month").value) - 1, 1);
 }
-function refMonthEndISO() {
-  const d = refMonthDate();
+function perfMonthDate() {
+  const p = paieMonthDate();
+  return new Date(p.getFullYear(), p.getMonth() - 1, 1);   // M-1 (gère janvier→décembre)
+}
+function perfMonthLabel() {
+  const d = perfMonthDate();
+  return MOIS_AB[d.getMonth()] + " " + d.getFullYear();
+}
+function perfMonthEndISO() {
+  const d = perfMonthDate();
   const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   return iso(d.getFullYear(), d.getMonth() + 1, last);
 }
 function monthMap() {
-  const d = refMonthDate(), map = {};
+  const d = perfMonthDate(), map = {};
   ["M1", "M2", "M3"].forEach((k, i) => {
     const m = new Date(d.getFullYear(), d.getMonth() - (2 - i), 1);
     map[k] = MOIS_AB[m.getMonth()] + " " + m.getFullYear();
@@ -134,7 +142,7 @@ function updateMonthLabels() {
   });
 }
 function updateBaseHeures() {
-  const d = refMonthDate();
+  const d = perfMonthDate();
   const days = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   let ouvres = 0;
   for (let i = 1; i <= days; i++) {
@@ -143,23 +151,30 @@ function updateBaseHeures() {
   }
   const base = ouvres * 8;
   $("#base-heures").value = base;
-  $("#base-heures-info").textContent = ouvres + " jours ouvrés × 8 h = " + base + " h (modifiable)";
+  $("#base-heures-info").textContent = "Perf. " + perfMonthLabel() + " : " +
+    ouvres + " j ouvrés × 8 h = " + base + " h (modifiable)";
 }
 function onRefMonthChange() { updateBaseHeures(); updateMonthLabels(); }
+
+/* ═══════════════ Dropdown activités (filtré par MSA du collaborateur) ═══════════════ */
+function renderActList(msaCode) {
+  const dl = $("#act-list");
+  if (!dl) return;
+  let rows = ALL_REF_ROWS;
+  if (msaCode && rows.some((r) => r.msa === msaCode)) {
+    rows = rows.filter((r) => r.msa === msaCode);   // activités du MSA du collaborateur
+  }
+  dl.innerHTML = rows.map((r) =>
+    `<option value="${esc(r.id)}" label="${esc(r.libelle || r.msa)}"></option>`).join("");
+}
 
 /* ═══════════════ Initialisation ═══════════════ */
 document.addEventListener("DOMContentLoaded", async () => {
   placeholderResult = $("#result-card").innerHTML;
   placeholderRules = $("#rules-card").innerHTML;
 
-  /* 🎨 DÉLÉGATION GLOBALE : tout changement de select profil (présent ou
-     futur, quelle que soit l'activité) repeint la couleur immédiatement. */
+  /* 🎨 Délégation globale : tout changement de select profil repeint la couleur */
   document.addEventListener("change", (e) => {
-    if (e.target && e.target.matches && e.target.matches("select.profile")) {
-      paintSelect(e.target);
-    }
-  });
-  document.addEventListener("input", (e) => {
     if (e.target && e.target.matches && e.target.matches("select.profile")) {
       paintSelect(e.target);
     }
@@ -176,7 +191,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const o = document.createElement("option");
     o.value = y; o.textContent = y; ys.appendChild(o);
   }
-  ms.value = now.getMonth() + 1;
+  ms.value = now.getMonth() + 1;      // défaut : mois de paie courant
   ys.value = now.getFullYear();
   ms.onchange = onRefMonthChange;
   ys.onchange = onRefMonthChange;
@@ -211,6 +226,7 @@ function resetAll() {
   $("#ref-month").value = now.getMonth() + 1;
   $("#ref-year").value = now.getFullYear();
   onRefMonthChange();
+  renderActList(null);                 // dropdown complet à nouveau
   $("#activites").innerHTML = "";
   addActivity();
   $("#result-card").innerHTML = placeholderResult;
@@ -245,29 +261,16 @@ async function loadRef() {
   try {
     const j = await api("/api/ref-msa");
     if (!j.ok) return;
-    const dl = $("#act-list");
-    if (dl) dl.innerHTML = "";
-    (j.data || []).forEach((r) => {
+    ALL_REF_ROWS = j.data || [];
+    Object.keys(REF_BY_MSA).forEach((k) => delete REF_BY_MSA[k]);
+    ALL_REF_ROWS.forEach((r) => {
       REF[r.id] = { msa: r.msa, libelle: r.libelle || "" };
-      if (dl) {
-        const o = document.createElement("option");
-        o.value = r.id; o.label = r.msa;
-        dl.appendChild(o);
-      }
+      (REF_BY_MSA[r.msa] = REF_BY_MSA[r.msa] || []).push(r);
     });
+    renderActList(employee ? employee.msa_code : null);
   } catch (e) { console.error(e); }
 }
-/* Ordre d'affichage voulu ; les profils inconnus passent en fin de liste */
-const PROFILE_ORDER = ["Non évalué", "Care", "Fragile", "Challenger", "Leader"];
-function orderedProfiles() {
-  const keys = Object.keys(PP.profils);
-  const known = PROFILE_ORDER.filter((k) => keys.includes(k));
-  const rest = keys.filter((k) => !PROFILE_ORDER.includes(k));
-  return [...known, ...rest];
-}
-
 function profileOptionsHTML() {
-  /* Options dans l'ordre voulu, avec couleurs dans le dropdown */
   return `<option value="" disabled selected>Sélectionner…</option>` +
     orderedProfiles().map((code) => {
       const pts = PP.profils[code];
@@ -300,7 +303,7 @@ function addActivity(activityId = "") {
           <input class="a-act" list="act-list" placeholder="ex : W0ZRVV" value="${esc(activityId)}"/>
           <span class="msa-resolved" hidden><span class="dot"></span><span class="txt"></span></span>
         </div>
-        <div class="field"><label>Heures sur l'activité *</label>
+        <div class="field"><label>Heures sur l'activité * <span class="muted">(0 autorisé)</span></label>
           <input class="a-heures" type="number" min="0" step="0.5" placeholder="ex : 105"/></div>
       </div>
       <div class="field"><label>Profils des 3 derniers mois *</label>
@@ -345,7 +348,7 @@ function addActivity(activityId = "") {
   cont.appendChild(div);
   resolve();
   updateMonthLabels();
-  colorProfiles(div);   // peint l'état initial (neutre si rien de sélectionné)
+  colorProfiles(div);
 }
 
 function refreshActs() {
@@ -361,7 +364,7 @@ function refreshActs() {
     if (!isNaN(h)) total += h;
   });
   $("#act-count").textContent = $("#activites").children.length + " / " + MAX_ACT;
-  $("#act-total-h").textContent = total > 0 ? "Heures totales : " + fmt.format(total) + " h" : "";
+  $("#act-total-h").textContent = "Heures totales : " + fmt.format(total) + " h";
 }
 
 /* ═══════════════ Recherche collaborateur ═══════════════ */
@@ -379,6 +382,10 @@ async function searchEmployee() {
     $("#site").value = SITE_LABELS[j.data.site] || j.data.site || "—";
     $("#site").dataset.code = j.data.site || "ANTA";
     $("#hire-date").value = j.data.hire_date || "";
+
+    /* Dropdown des activités filtré sur le MSA du collaborateur */
+    renderActList(j.data.msa_code);
+
     const first = $("#activites").querySelector(".act-card");
     if (first && !first.querySelector(".a-act").value && j.data.projet_code) {
       first.querySelector(".a-act").value = j.data.projet_code;
@@ -418,14 +425,14 @@ async function calculate() {
 
   const acts = [...$("#activites").children].map((c) => ({
     activity_id: c.querySelector(".a-act").value.trim().toUpperCase(),
-    heures: parseFloat(c.querySelector(".a-heures").value),
+    heures: parseFloat(c.querySelector(".a-heures").value) || 0,   // vide ou 0 → 0
     profiles: [".a-p1", ".a-p2", ".a-p3"].map((s) => c.querySelector(s).value),
   }));
   for (let i = 0; i < acts.length; i++) {
     const n = i + 1;
     if (!acts[i].activity_id) { toast(`Activité ${n} : ID d'activité manquant.`, "error"); return; }
     if (!REF[acts[i].activity_id]) { toast(`Activité ${n} : ID inconnu dans le référentiel.`, "error"); return; }
-    if (!acts[i].heures || acts[i].heures <= 0) { toast(`Activité ${n} : heures > 0 requises.`, "error"); return; }
+    if (acts[i].heures < 0) { toast(`Activité ${n} : heures négatives interdites.`, "error"); return; }
     if (acts[i].profiles.some((p) => !p)) { toast(`Activité ${n} : 3 profils requis.`, "error"); return; }
   }
 
@@ -438,7 +445,7 @@ async function calculate() {
       body: JSON.stringify({
         matricule: employee ? employee.matricule : $("#matricule").value.trim(),
         hire_date: hireDate, site,
-        reference_date: refMonthEndISO(),
+        reference_date: perfMonthEndISO(),     // fin du mois de PERFORMANCE
         base_heures: baseHeures,
         activites: acts }) });
     if (!j.ok) { toast(j.error, "error"); return; }
@@ -478,13 +485,13 @@ function renderResult(d) {
       <div class="result-box">
         <span class="result-label">Activités calculées</span>
         <span class="result-value">${acts.filter((a) => a.eligible).length}<small>/${acts.length}</small></span>
-        <span class="result-sub">Heures : ${fmt.format(d.total_heures || 0)} h ·
-          Base : ${fmt.format(d.base_heures || 0)} h · Ancienneté : ${d.anciennete_affichee} mois</span>
+        <span class="result-sub">Perf. ${esc(perfMonthLabel())} · Heures : ${fmt.format(d.total_heures || 0)} h ·
+          Base : ${fmt.format(d.base_heures || 0)} h</span>
       </div>
       <div class="result-box highlight">
         <span class="result-label">Prime de régularité estimée</span>
         <span class="result-value gold" id="rv-amount">0</span>
-        <span class="result-sub">(base × heures) ÷ base d'heures</span>
+        <span class="result-sub">Ancienneté : ${d.anciennete_affichee} mois (au ${d.date_reference})</span>
       </div>
     </div>
     <div class="table-wrap"><table class="table">
