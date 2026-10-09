@@ -631,8 +631,8 @@ def api_calculate():
             heures = 0.0
         if not activity_id:
             return jsonify({"ok": False, "error": f"Activité {i} : ID d'activité manquant."}), 400
-        if heures <= 0:
-            return jsonify({"ok": False, "error": f"Activité {i} : heures > 0 requises."}), 400
+        if heures < 0:
+            return jsonify({"ok": False, "error": f"Activité {i} : heures négatives interdites."}), 400
         if len(profiles) != 3 or any(x not in profils for x in profiles):
             return jsonify({"ok": False, "error": f"Activité {i} : 3 profils attendus parmi : "
                             + ", ".join(profils) + "."}), 400
