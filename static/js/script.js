@@ -222,7 +222,8 @@ function resetAll() {
 function fillPhProfils() {
   const ph = $("#ph-profils");
   if (!ph) return;
-  ph.innerHTML = Object.entries(PP.profils).map(([c, p]) => {
+  ph.innerHTML = orderedProfiles().map((c) => {
+    const p = PP.profils[c];
     const col = colorForProfile(c);
     const cls = col ? "pc-" + col : "pc-gray";
     return `<span class="pchip ${cls}">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`;
@@ -256,10 +257,20 @@ async function loadRef() {
     });
   } catch (e) { console.error(e); }
 }
+/* Ordre d'affichage voulu ; les profils inconnus passent en fin de liste */
+const PROFILE_ORDER = ["Non évalué", "Care", "Fragile", "Challenger", "Leader"];
+function orderedProfiles() {
+  const keys = Object.keys(PP.profils);
+  const known = PROFILE_ORDER.filter((k) => keys.includes(k));
+  const rest = keys.filter((k) => !PROFILE_ORDER.includes(k));
+  return [...known, ...rest];
+}
+
 function profileOptionsHTML() {
-  /* Options colorées : le dropdown ouvert montre aussi les couleurs */
+  /* Options dans l'ordre voulu, avec couleurs dans le dropdown */
   return `<option value="" disabled selected>Sélectionner…</option>` +
-    Object.entries(PP.profils).map(([code, pts]) => {
+    orderedProfiles().map((code) => {
+      const pts = PP.profils[code];
       const val = (pts === null || pts === undefined) ? "vide" : pts + " pt";
       const c = colorForProfile(code);
       const style = c
