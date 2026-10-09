@@ -316,4 +316,24 @@ body.login-page{min-height:100vh;display:flex;align-items:center;justify-content
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+
+/* ═══════════ Code couleur des profils ═══════════ */
+/* Blocs de sélection dans les cartes d'activité */
+.profile-cell select{transition:border-color .2s,background .2s}
+.profile-cell.pc-green select{border-color:#16a34a;background:#f0fdf4;color:#14532d}
+.profile-cell.pc-green .p-month{color:#16a34a}
+.profile-cell.pc-orange select{border-color:#e08c0d;background:#fffbeb;color:#7c4a03}
+.profile-cell.pc-orange .p-month{color:#d97706}
+.profile-cell.pc-red select{border-color:#dc2626;background:#fef2f2;color:#7f1d1d}
+.profile-cell.pc-red .p-month{color:#dc2626}
+.profile-cell.pc-gray select{border-color:#94a3b8;background:#f1f5f9;color:#64748b}
+.profile-cell.pc-gray .p-month{color:#94a3b8}
+
+/* Pastilles de profil (panneau d'attente + détail des règles) */
+.pchip{display:inline-block;border-radius:999px;padding:2px 10px;
+  font-size:.74rem;font-weight:700;white-space:nowrap;border:1.5px solid transparent}
+.pchip.pc-green{background:#f0fdf4;color:#15803d;border-color:#86efac}
+.pchip.pc-orange{background:#fffbeb;color:#b45309;border-color:#fcd34d}
+.pchip.pc-red{background:#fef2f2;color:#b91c1c;border-color:#fca5a5}
+.pchip.pc-gray{background:#f1f5f9;color:#64748b;border-color:#cbd5e1}
 }
