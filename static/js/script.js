@@ -266,14 +266,16 @@ function addActivity(activityId = "") {
     div.remove(); refreshActs();
   };
   div.querySelector(".a-heures").addEventListener("input", refreshActs);
+
+  // 🎨 Code couleur : réagit à chaque changement de profil
   div.querySelectorAll(".profile-row select").forEach((sel) =>
     sel.addEventListener("change", () => colorProfiles(div)));
+
   cont.appendChild(div);
   resolve();
-  colorProfiles(div);
   updateMonthLabels();
+  colorProfiles(div);   // 🎨 couleur initiale (aucune sélection = neutre)
 }
-
 function refreshActs() {
   let total = 0;
   [...$("#activites").children].forEach((c, i) => {
