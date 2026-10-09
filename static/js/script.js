@@ -1,34 +1,32 @@
 /* ============================================================
-   SimuPrime v12 — script.js COMPLET
-   Mois de référence · base d'heures auto · Care/Challenger · typo auto
+   SimuPrime v12.1 — script.js COMPLET (avec code couleur profils)
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
-const REF = {};                 // { "W0ZRVV": {msa, libelle} }
+const REF = {};
 
-/* Code couleur des profils (blocs + pastilles) */
+/* 🎨 Code couleur — couvre tous les noms (actuels + historiques BDD) */
 const PROFILE_CLASSES = {
-  "Leader": "pc-green", "Challenger": "pc-green",
-  "Fragile": "pc-orange",
-  "Care": "pc-red",
+  "Leader": "pc-green", "Challenger": "pc-green", "L": "pc-green",
+  "Fragile": "pc-orange", "F": "pc-orange",
+  "Care": "pc-red", "Soutien Intense": "pc-red", "SI": "pc-red",
   "Non évalué": "pc-gray",
 };
 function colorProfiles(cardEl) {
-  cardEl.querySelectorAll(".profile-cell").forEach((cell) => {
-    const sel = cell.querySelector("select");
-    cell.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
-    const cls = sel && PROFILE_CLASSES[sel.value];
-    if (cls) cell.classList.add(cls);
+  (cardEl ? [cardEl] : document.querySelectorAll(".act-card")).forEach((card) => {
+    card.querySelectorAll(".profile-cell").forEach((cell) => {
+      const sel = cell.querySelector("select");
+      cell.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
+      const cls = sel && PROFILE_CLASSES[sel.value];
+      if (cls) cell.classList.add(cls);
+    });
   });
 }
 function profilBadgeHTML(name) {
   const cls = PROFILE_CLASSES[name];
   return cls ? `<span class="pchip ${cls}">${esc(name)}</span>` : `<b>${esc(name)}</b>`;
 }
-let employee = null;
-const MAX_ACT = 7;
-let placeholderResult = "", placeholderRules = "";
 
 const MOIS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet",
                  "Août","Septembre","Octobre","Novembre","Décembre"];
@@ -106,9 +104,6 @@ function onRefMonthChange() { updateBaseHeures(); updateMonthLabels(); }
 
 /* ═══════════════ Initialisation ═══════════════ */
 document.addEventListener("DOMContentLoaded", async () => {
-  placeholderResult = $("#result-card").innerHTML;
-  placeholderRules = $("#rules-card").innerHTML;
-
   const now = new Date();
   const ms = $("#ref-month");
   MOIS_FR.forEach((m, i) => {
@@ -157,8 +152,6 @@ function resetAll() {
   onRefMonthChange();
   $("#activites").innerHTML = "";
   addActivity();
-  $("#result-card").innerHTML = placeholderResult;
-  $("#rules-card").innerHTML = placeholderRules;
   fillPhProfils();
   window.scrollTo({ top: 0, behavior: "smooth" });
   toast("Formulaire réinitialisé — nouvelle simulation prête ✨", "success");
@@ -267,15 +260,16 @@ function addActivity(activityId = "") {
   };
   div.querySelector(".a-heures").addEventListener("input", refreshActs);
 
-  // 🎨 Code couleur : réagit à chaque changement de profil
+  /* 🎨 Couleur : appliquée au chargement + à chaque changement */
   div.querySelectorAll(".profile-row select").forEach((sel) =>
     sel.addEventListener("change", () => colorProfiles(div)));
 
   cont.appendChild(div);
   resolve();
   updateMonthLabels();
-  colorProfiles(div);   // 🎨 couleur initiale (aucune sélection = neutre)
+  colorProfiles(div);
 }
+
 function refreshActs() {
   let total = 0;
   [...$("#activites").children].forEach((c, i) => {
@@ -303,12 +297,10 @@ async function searchEmployee() {
       box.innerHTML = `<div class="alert warn">${esc(j.error)}</div>`; return; }
     employee = j.data;
     box.innerHTML = renderEmployee(j.data);
-    // Paramètres auto-remplis (lecture seule)
     $("#typo").value = j.data.typo || "SIMPLE";
     $("#site").value = SITE_LABELS[j.data.site] || j.data.site || "—";
     $("#site").dataset.code = j.data.site || "ANTA";
     $("#hire-date").value = j.data.hire_date || "";
-    // Pré-remplit l'ID de la 1re activité
     const first = $("#activites").querySelector(".act-card");
     if (first && !first.querySelector(".a-act").value && j.data.projet_code) {
       first.querySelector(".a-act").value = j.data.projet_code;
@@ -448,7 +440,7 @@ function renderResult(d) {
         <p class="small"><b>Conditions :</b> ${esc(conditions(a))}</p>
         <p class="small"><b>Mois comptés (${a.nb_mois_profil}) :</b>
           ${(a.detail_points || []).filter((p) => p.pris_en_compte)
-            .map((p) => `${p.mois} : ${profilBadgeHTML(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`)
+            .map((p) => `${mm[p.mois] || p.mois} : ${profilBadgeHTML(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`)
             .join(" · ")}</p>
         ${a.nb_mois_profil < 3 && (d.anciennete_mois >= 4 && d.anciennete_mois <= 6)
           ? `<p class="small"><b>Nouvel intégrant (4-6 mois) :</b> 1er mois non compté.</p>` : ""}
