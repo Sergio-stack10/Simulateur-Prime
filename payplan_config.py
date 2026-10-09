@@ -1,111 +1,96 @@
 # -*- coding: utf-8 -*-
 """
 =====================================================================
- PAYPLAN — PRIME DE RÉGULARITÉ (v10 · paliers · prorata base d'heures)
+ PAYPLAN — PRIME DE RÉGULARITÉ (v12)
 =====================================================================
- ⚠️⚠️⚠️  MONTANTS = PLACEHOLDERS (000000). Vos vrais montants :
- soit vous me les collez en TEXTE depuis Excel, soit Admin → Payplan.
+ ⚠️ Les règles ci-dessous ne servent qu'au PREMIER démarrage (BDD vide).
+ Votre payplan réel vit dans MongoDB (matrice importée via Admin).
 =====================================================================
 """
 
 PROFILE_POINTS = {
     "Leader": 3,
+    "Challenger": 3,
     "Fragile": 1,
-    "Soutien Intense": 0,
-    "Non évalué": None,
+    "Care": 0,
+    "Non évalué": None,     # None = vide : aucun point
 }
 
 MIN_ANCIENNETE_MOIS = 4
-REGLE_DEGRADATION = True   # dernier mois en baisse → points non comptés (L-L-F → 6)
+
+# Dernier mois compté en baisse → ses points ne sont pas comptés (L-L-F → 6)
+REGLE_DEGRADATION = True
+
+# Nouveaux intégrants (ancienneté 4 à 6 mois à la fin du mois de référence) :
+# le profil du PREMIER mois (M1) n'est pas pris en compte — seuls les
+# 2 derniers mois comptent, quelle que soit la règle du payplan.
+REGLE_NOUVEAUX_4_6 = True
 
 def _paliers(*triplets):
     return [{"min": a, "max": b, "montant": m} for a, b, m in triplets]
 
+# ⚠️ PLACEHOLDERS (0 Ar) — seed uniquement. Vos montants réels sont en BDD.
 PAYPLAN_RULES = [
-    # ---- Listes MSA spécifiques (ANTA · AVANT 01/06/2023 uniquement) ----
     {"index": 1, "nom": "ANTA · Avant 01/06/2023 · WHFR1135 & WHFR919",
      "sites": ["ANTA"], "msa": ["WHFR1135", "WHFR919"],
      "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 4, "anciennete_max": None, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 5, 0), (6, 9, 0)),
-     "explication": "Liste 1 — ⚠️ montants placeholders."},
-
+     "montants": _paliers((0, 2, 0), (3, 5, 0), (6, 9, 0)), "explication": "Seed."},
     {"index": 2, "nom": "ANTA · Avant 01/06/2023 · Projets spécifiques (liste 2)",
      "sites": ["ANTA"],
      "msa": ["WHFR919", "WHFR1006", "WHFR1039", "WHFR1154", "WHFR1171", "WHFR218",
              "WHFR2749", "WHFR594", "WHFR907", "WHFR977", "WHFR1265"],
      "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 4, "anciennete_max": None, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 5, 0), (6, 9, 0)),
-     "explication": "Liste 2 — ⚠️ montants placeholders."},
-
-    # ---- TMM · AVANT ----
+     "montants": _paliers((0, 2, 0), (3, 5, 0), (6, 9, 0)), "explication": "Seed."},
     {"index": 10, "nom": "TMM · Avant 01/06/2023 · 4 à 6 mois",
      "sites": ["TMM"], "msa": [], "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 4, "anciennete_max": 6, "nb_mois_profil": 2,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)), "explication": "Seed."},
     {"index": 11, "nom": "TMM · Avant 01/06/2023 · 7 à 18 mois",
      "sites": ["TMM"], "msa": [], "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 7, "anciennete_max": 18, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
     {"index": 12, "nom": "TMM · Avant 01/06/2023 · 19 mois et +",
      "sites": ["TMM"], "msa": [], "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 19, "anciennete_max": None, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
-
-    # ---- ANTA · AVANT (général) ----
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
     {"index": 20, "nom": "ANTA · Avant 01/06/2023 · 4 à 6 mois",
      "sites": ["ANTA"], "msa": [], "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 4, "anciennete_max": 6, "nb_mois_profil": 2,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)), "explication": "Seed."},
     {"index": 21, "nom": "ANTA · Avant 01/06/2023 · 7 à 18 mois",
      "sites": ["ANTA"], "msa": [], "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 7, "anciennete_max": 18, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
     {"index": 22, "nom": "ANTA · Avant 01/06/2023 · 19 mois et +",
      "sites": ["ANTA"], "msa": [], "embauche_avant": "2023-06-01", "embauche_apres": None,
      "anciennete_min": 19, "anciennete_max": None, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
-
-    # ---- TMM · APRÈS ----
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
     {"index": 40, "nom": "TMM · Après 01/06/2023 · 4 à 6 mois",
      "sites": ["TMM"], "msa": [], "embauche_avant": None, "embauche_apres": "2023-06-01",
      "anciennete_min": 4, "anciennete_max": 6, "nb_mois_profil": 2,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)), "explication": "Seed."},
     {"index": 41, "nom": "TMM · Après 01/06/2023 · 7 à 18 mois",
      "sites": ["TMM"], "msa": [], "embauche_avant": None, "embauche_apres": "2023-06-01",
      "anciennete_min": 7, "anciennete_max": 18, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
     {"index": 42, "nom": "TMM · Après 01/06/2023 · 19 mois et +",
      "sites": ["TMM"], "msa": [], "embauche_avant": None, "embauche_apres": "2023-06-01",
      "anciennete_min": 19, "anciennete_max": None, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
-
-    # ---- ANTA · APRÈS (général — fallback des listes spécifiques) ----
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
     {"index": 50, "nom": "ANTA · Après 01/06/2023 · 4 à 6 mois",
      "sites": ["ANTA"], "msa": [], "embauche_avant": None, "embauche_apres": "2023-06-01",
      "anciennete_min": 4, "anciennete_max": 6, "nb_mois_profil": 2,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0)), "explication": "Seed."},
     {"index": 51, "nom": "ANTA · Après 01/06/2023 · 7 à 18 mois",
      "sites": ["ANTA"], "msa": [], "embauche_avant": None, "embauche_apres": "2023-06-01",
      "anciennete_min": 7, "anciennete_max": 18, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
     {"index": 52, "nom": "ANTA · Après 01/06/2023 · 19 mois et +",
      "sites": ["ANTA"], "msa": [], "embauche_avant": None, "embauche_apres": "2023-06-01",
      "anciennete_min": 19, "anciennete_max": None, "nb_mois_profil": 3,
-     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)),
-     "explication": "⚠️ placeholders."},
+     "montants": _paliers((0, 2, 0), (3, 4, 0), (5, 6, 0), (7, 9, 0)), "explication": "Seed."},
 ]
 
 REF_MSA_SEED = [
@@ -213,9 +198,15 @@ def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_point
                               f"embauche={hire_date.strftime('%d/%m/%Y')} · "
                               f"ancienneté={anciennete} mois. Complétez le payplan (Admin).")
         return res
-    total, detail = somme_points_profils(profiles, regle["nb_mois_profil"], profile_points)
+
+    nb_mois = regle["nb_mois_profil"]
+    # Nouveaux intégrants (4 à 6 mois) : le 1er mois n'est pas compté
+    if REGLE_NOUVEAUX_4_6 and 4 <= anciennete <= 6:
+        nb_mois = min(nb_mois, 2)
+
+    total, detail = somme_points_profils(profiles, nb_mois, profile_points)
     montant = _montant_for_points(regle["montants"], total)
-    res.update({"regle": regle["nom"], "nb_mois_profil": regle["nb_mois_profil"],
+    res.update({"regle": regle["nom"], "nb_mois_profil": nb_mois,
                 "detail_points": detail, "total_points": total,
                 "explication": regle.get("explication", ""),
                 "bareme": regle["montants"],
@@ -233,7 +224,7 @@ def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_point
 
 def calculate_prime(hire_date, site, activites, reference_date=None,
                     profile_points=None, rules=None, base_heures=None):
-    """Prorata : montant_proratise = (montant_base × heures_activité) ÷ base_heures"""
+    """Prorata : (montant_base × heures_activité) ÷ base_heures"""
     profile_points = profile_points if profile_points is not None else PROFILE_POINTS
     rules = rules if rules is not None else PAYPLAN_RULES
     reference_date = reference_date or date.today()
