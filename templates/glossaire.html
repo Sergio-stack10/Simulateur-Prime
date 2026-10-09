@@ -12,7 +12,7 @@
 <nav class="topbar">
   <div class="brand">
     <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo"/>
-    <span class="brand-title">Calculateur de prime de régularité — Glossaire</span>
+    <span class="brand-title">Calculateur de prime de régularité</span>
   </div>
   <div class="topbar-actions">
     <a class="btn btn-ghost btn-sm" href="/">← Simulateur</a>
@@ -22,94 +22,172 @@
   </div>
 </nav>
 
-<main class="aide-main">
+<main class="glo-main">
 
-  <section class="card reveal">
-    <h2><span class="chip">📖</span> Mode opératoire du simulateur</h2>
+  <!-- ═══════ Bannière ═══════ -->
+  <section class="glo-hero reveal">
+    <div class="glo-hero-badge">📖</div>
+    <h1>Glossaire <em>&amp;</em> Mode opératoire</h1>
+    <p>Tout ce qu'il faut savoir pour simuler une prime de régularité en quelques minutes.</p>
+    <nav class="glo-nav">
+      <a href="#etapes">🚀 Démarrage</a>
+      <a href="#profils">🏷️ Profils</a>
+      <a href="#regles">🧮 Règles de calcul</a>
+      <a href="#astuces">💡 Bon à savoir</a>
+      {% if role == 'admin' %}<a href="#admin">⚙ Admin</a>{% endif %}
+    </nav>
+  </section>
 
-    <div class="help-step"><span class="hs-num">1</span>
-      <div><b>Identifier le collaborateur</b><br/>
-      Saisissez son <b>matricule WKD</b> (ex : 102573627) ou son <b>matricule paie</b>
-      (ex : W14503), puis cliquez sur 🔍. La typologie (TECH / SIMPLE), le site,
-      la date d'embauche et son MSA se remplissent automatiquement.</div></div>
+  <!-- ═══════ Étapes ═══════ -->
+  <section id="etapes" class="card glo-card reveal">
+    <h2><span class="chip">🚀</span> Les 5 étapes d'une simulation</h2>
+    <ol class="glo-steps">
+      <li class="glo-step">
+        <span class="gs-badge">1</span>
+        <div class="gs-body">
+          <h3>Identifier le collaborateur</h3>
+          <p>Saisissez son <b>matricule WKD</b> ou son <b>matricule paie</b>, puis cliquez
+             sur 🔍. Typo (TECH / SIMPLE), site, date d'embauche et MSA se remplissent
+             automatiquement.</p>
+          <div class="gs-tags"><span class="gtag">ex : 102573627</span><span class="gtag">ex : W14503</span></div>
+        </div>
+      </li>
+      <li class="glo-step">
+        <span class="gs-badge">2</span>
+        <div class="gs-body">
+          <h3>Choisir le mois de paie</h3>
+          <p>Le mois de paie est le <b>M+1 du mois de performance</b> (paie Octobre →
+             performance Septembre). La <b>base d'heures</b> se calcule automatiquement sur
+             le mois de performance (jours ouvrés × 8 h) — modifiable.</p>
+        </div>
+      </li>
+      <li class="glo-step">
+        <span class="gs-badge">3</span>
+        <div class="gs-body">
+          <h3>Renseigner les activités</h3>
+          <p>Le champ <b>ID de l'activité</b> propose les activités du MSA du collaborateur
+             (toute autre ID reste saisissable). L'MSA s'affiche en vert. Ajoutez les
+             <b>heures</b> (0 autorisé) et les <b>profils des 3 derniers mois</b>.</p>
+        </div>
+      </li>
+      <li class="glo-step">
+        <span class="gs-badge">4</span>
+        <div class="gs-body">
+          <h3>Lancer le calcul</h3>
+          <p>Cliquez sur <b>✨ Calculer ma prime</b> : points, montant base et prorata
+             s'affichent par activité.</p>
+        </div>
+      </li>
+      <li class="glo-step">
+        <span class="gs-badge">5</span>
+        <div class="gs-body">
+          <h3>Lire les résultats</h3>
+          <p>Le tableau détaille chaque activité. En dessous, les <b>règles du payplan
+             appliquées</b> : cliquez sur une activité pour voir ses conditions, les mois
+             comptés, le barème et la formule du prorata.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
 
-    <div class="help-step"><span class="hs-num">2</span>
-      <div><b>Choisir le mois de paie</b><br/>
-      Le mois de paie est le mois <b>M+1</b> du mois de performance.
-      Exemple : paie <b>Octobre</b> → performance <b>Septembre</b>.
-      La <b>base d'heures</b> se calcule automatiquement sur le mois de performance
-      (jours ouvrés × 8 h) — elle reste modifiable.</div></div>
+  <!-- ═══════ Profils ═══════ -->
+  <section id="profils" class="card glo-card reveal">
+    <h2><span class="chip">🏷️</span> Profils &amp; points</h2>
+    <div class="glo-profiles">
+      <div class="gprof g-green">
+        <span class="gp-emoji">🏆</span><b>Leader</b>
+        <span class="gp-pts">3 pts</span>
+        <small>Performance élevée</small>
+      </div>
+      <div class="gprof g-green">
+        <span class="gp-emoji">⚡</span><b>Challenger</b>
+        <span class="gp-pts">3 pts</span>
+        <small>Performance élevée</small>
+      </div>
+      <div class="gprof g-orange">
+        <span class="gp-emoji">🌱</span><b>Fragile</b>
+        <span class="gp-pts">1 pt</span>
+        <small>Performance à consolider</small>
+      </div>
+      <div class="gprof g-red">
+        <span class="gp-emoji">🤝</span><b>Care</b>
+        <span class="gp-pts">0 pt</span>
+        <small>En accompagnement</small>
+      </div>
+      <div class="gprof g-gray">
+        <span class="gp-emoji">➖</span><b>Non évalué</b>
+        <span class="gp-pts">vide</span>
+        <small>Aucun point attribué</small>
+      </div>
+    </div>
+  </section>
 
-    <div class="help-step"><span class="hs-num">3</span>
-      <div><b>Renseigner les activités du mois</b><br/>
-      Pour chaque activité : le champ <b>ID de l'activité</b> propose la liste des
-      activités du MSA du collaborateur (tapez ou choisissez — toute autre ID reste
-      possible). L'MSA s'affiche automatiquement en vert. Saisissez les
-      <b>heures passées</b> sur l'activité (0 autorisé), puis les
-      <b>profils des 3 derniers mois</b> (mois de performance et les 2 précédents).</div></div>
+  <!-- ═══════ Règles de calcul ═══════ -->
+  <section id="regles" class="card glo-card reveal">
+    <h2><span class="chip">🧮</span> Règles de calcul</h2>
 
-    <div class="help-step"><span class="hs-num">4</span>
-      <div><b>Comprendre le calcul</b><br/>
-      Points par profil :
-      <span class="pchip pc-green">Leader · 3</span>
-      <span class="pchip pc-green">Challenger · 3</span>
-      <span class="pchip pc-orange">Fragile · 1</span>
-      <span class="pchip pc-red">Care · 0</span>
-      <span class="pchip pc-gray">Non évalué · vide</span><br/>
-      <b>Règles appliquées :</b><br/>
-      • <b>Dégradation</b> : si le profil du dernier mois est en baisse par rapport au
-      mois précédent, ses points ne sont pas comptés (Leader-Leader-Fragile → 6 pts).<br/>
-      • <b>Nouveaux intégrants</b> (ancienneté 4 à 6 mois) : le profil du 1ᵉʳ mois
-      n'est pas pris en compte (2 mois comptés).<br/>
-      • <b>Montant base</b> : déterminé par le payplan selon le site, le MSA, la date
-      d'embauche (pivot 01/06/2023), l'ancienneté et le total de points. Un collaborateur
-      TECH embauché après le pivot prend la règle générale de son site (ANTA / TMM).<br/>
-      • <b>Prorata</b> : Prime = Σ [ montant base × (heures de l'activité ÷ base d'heures) ].</div></div>
+    <div class="glo-rule g-orange">
+      <h3>⚠️ Dégradation</h3>
+      <p>Si le profil du <b>dernier mois</b> est en baisse par rapport au mois précédent,
+         ses points <b>ne sont pas comptés</b>.</p>
+      <div class="gex">Leader · Leader · Fragile → 3 + 3 + <s>1</s> = <b>6 pts</b></div>
+    </div>
 
-    <div class="help-step"><span class="hs-num">5</span>
-      <div><b>Lire les résultats</b><br/>
-      Le tableau détaille chaque activité (heures, points, montant base, montant
-      proratisé). Les <b>Règles du payplan appliquées</b> s'affichent en dessous :
-      cliquez sur une activité pour voir ses conditions, les mois comptés,
-      le barème complet et la formule du prorata.</div></div>
+    <div class="glo-rule g-blue">
+      <h3>🆕 Nouveaux intégrants (ancienneté 4 à 6 mois)</h3>
+      <p>Le profil du <b>1ᵉʳ mois n'est pas pris en compte</b> : seuls les 2 derniers
+         mois comptent.</p>
+      <div class="gex">M1 ignoré · M2 + M3 seulement</div>
+    </div>
 
-    <div class="help-note">💡 Les simulations sont enregistrées dans
-      <b>Mes simulations</b> (propres à votre session). Utilisez
-      <b>🔄 Nouvelle simulation</b> pour tout réinitialiser.</div>
+    <div class="glo-rule g-violet">
+      <h3>➗ Prorata</h3>
+      <p>Chaque activité a son <b>montant base</b> (selon site, MSA, date d'embauche,
+         ancienneté et points), ensuite proratisé :</p>
+      <div class="gex gex-formule">Prime = Σ [ montant base × (heures ÷ base d'heures) ]</div>
+      <div class="gex">185 000 Ar × (88 h ÷ 176 h) = <b>92 500 Ar</b></div>
+    </div>
+  </section>
+
+  <!-- ═══════ Astuces ═══════ -->
+  <section id="astuces" class="card glo-card reveal">
+    <h2><span class="chip">💡</span> Bon à savoir</h2>
+    <div class="glo-tips">
+      <div class="gtip"><b>🗓️ Mois de paie = M+1</b>
+        <span>Paie Octobre → performance Septembre : base d'heures, profils et
+        ancienneté suivent le mois de performance.</span></div>
+      <div class="gtip"><b>🕒 Base d'heures auto</b>
+        <span>Jours ouvrés du mois de performance × 8 h — le champ reste
+        modifiable si besoin.</span></div>
+      <div class="gtip"><b>0️⃣ Heures à 0</b>
+        <span>Une activité peut avoir 0 heure : son montant proratisé sera 0 Ar.</span></div>
+      <div class="gtip"><b>🔒 Sessions privées</b>
+        <span>« Mes simulations » n'est visible que par vous. Le bouton 🗑 les
+        supprime, 🔄 réinitialise le formulaire.</span></div>
+    </div>
   </section>
 
   {% if role == 'admin' %}
-  <section class="card reveal" style="--d:.08s">
-    <h2><span class="chip">⚙</span> Pour les administrateurs</h2>
-
-    <div class="help-step"><span class="hs-num">⬆</span>
-      <div><b>Extraction ACTIF</b><br/>
-      Glissez-déposez le fichier <code>ACTIF.xlsx</code> (ou cliquez). Il alimente la
-      recherche par matricule : nom, poste, site, MSA, date d'embauche.
-      À recharger à chaque nouvelle extraction.</div></div>
-
-    <div class="help-step"><span class="hs-num">🔗</span>
-      <div><b>Référentiel Activités ↔ MSA</b><br/>
-      Fait le lien entre chaque <b>ID d'activité</b> (ex : W0ZRVV) et son <b>MSA</b>
-      (ex : WHFR2729) + libellé. Importable depuis un Excel à 3 colonnes
-      (MSA · Activités · ID activité), ou éditable ligne par ligne.
-      C'est lui qui alimente l'autocomplétion du simulateur.</div></div>
-
-    <div class="help-step"><span class="hs-num">⚙</span>
-      <div><b>Payplan</b><br/>
-      Importable depuis la matrice Excel (colonnes Date · Avant · Après · Site · MSA ·
-      Anc_min · Anc_max · Pts_min · Pts_max · Montant · Index ; cellule
-      <code>*</code> = vide/tous). Modifiable aussi règle par règle (barèmes en
-      paliers « de → à points »). Les changements s'appliquent immédiatement
-      aux calculs — sans redéploiement.</div></div>
-
-    <div class="help-step"><span class="hs-num">🗂</span>
-      <div><b>Historique & export</b><br/>
-      Toutes les simulations (toutes sessions), filtrables et exportables en CSV.</div></div>
+  <!-- ═══════ Admin ═══════ -->
+  <section id="admin" class="card glo-card reveal">
+    <h2><span class="chip">⚙</span> Espace administration</h2>
+    <div class="glo-admin">
+      <div class="gadm adm-blue"><span>⬆</span><b>Extraction ACTIF</b>
+        <small>Glisser-déposer ACTIF.xlsx → alimente la recherche par matricule.</small></div>
+      <div class="gadm adm-cyan"><span>🔗</span><b>Référentiel Activités ↔ MSA</b>
+        <small>Lien ID d'activité → MSA + libellé. Import Excel ou édition manuelle.</small></div>
+      <div class="gadm adm-violet"><span>📊</span><b>Payplan</b>
+        <small>Import de la matrice Excel ou édition des règles et paliers. Effet
+        immédiat sur les calculs.</small></div>
+      <div class="gadm adm-gold"><span>🗂</span><b>Historique</b>
+        <small>Toutes les simulations, filtrables et exportables en CSV.</small></div>
+    </div>
   </section>
   {% endif %}
 
 </main>
+
+<footer class="footer-fix">Developped by <span>RAVO SERGIO</span></footer>
 
 <div id="toasts"></div>
 <script>
