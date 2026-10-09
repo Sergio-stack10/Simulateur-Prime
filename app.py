@@ -141,6 +141,11 @@ def index():
 def admin_page():
     return render_template("admin.html", role="admin")
 
+@app.route("/glossaire")
+@login_required
+def glossaire_page():
+    return render_template("glossaire.html", role=session["role"])
+
 # ----------------------------------------------------------------- Auth API
 @app.post("/api/auth/login")
 def auth_login():
