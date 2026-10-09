@@ -28,7 +28,7 @@
     <div class="col">
 
       <section class="card reveal" style="--d:.04s">
-        <h2><span class="chip">1</span> Identifier le collaborateur</h2>
+        <h2><span class="chip">1</span> Informations collaborateur</h2>
         <div class="search-bar">
           <input id="matricule" type="text" autocomplete="off"
                  placeholder="Matricule WKD (ex : 102573627) ou n° de paie (W…)"/>
@@ -37,27 +37,27 @@
         <div id="employee-result"></div>
       </section>
 
-      <section class="card reveal" style="--d:.1s">
-        <h2><span class="chip">2</span> Paramètres</h2>
-        <div class="grid-4">
-          <div class="field"><label for="hire-date">Date d'embauche *</label>
-            <input id="hire-date" type="date"/></div>
-          <div class="field"><label for="reference-date">Date de référence</label>
-            <input id="reference-date" type="date"/>
-            <button id="btn-eom" class="linklike" type="button">🗓 Fin du mois</button></div>
-          <div class="field"><label for="site">Site (payplan) *</label>
-            <select id="site">
-              <option value="ANTA">ANTA — Antananarivo</option>
-              <option value="TMM">TMM — Tamatave</option>
-              <option value="AUTRE">AUTRE</option>
-            </select></div>
-          <div class="field"><label for="base-heures">Base d'heures *</label>
-            <input id="base-heures" type="number" min="1" step="0.5" placeholder="ex : 176"/>
-            <span class="muted small">Ex. : 176 h/mois</span></div>
+      <section class="card reveal" style="--d:.12s" id="result-card">
+        <h2><span class="chip">4</span> Résultats de la simulation</h2>
+        <div class="ph-steps">
+          <div class="ph-step"><b>1.</b> Recherchez le matricule — les paramètres se remplissent</div>
+          <div class="ph-step"><b>2.</b> Choisissez le mois de référence</div>
+          <div class="ph-step"><b>3.</b> Renseignez activités, heures et profils</div>
+          <div class="ph-step"><b>4.</b> Lancez le calcul</div>
+        </div>
+        <div class="ph-profils" id="ph-profils"></div>
+        <div class="ph-formule">
+          Prime = Σ [ (Montant base × heures activité) ÷ base d'heures ]
         </div>
       </section>
 
-      <section class="card reveal" style="--d:.16s">
+      <section class="card reveal" style="--d:.16s" id="rules-card">
+        <h2><span class="chip">§</span> Règles du payplan appliquées</h2>
+        <p class="muted small">Les règles appliquées à chaque activité s'afficheront ici
+           après le calcul (cliquez sur une activité pour le détail).</p>
+      </section>
+
+      <section class="card reveal" style="--d:.2s">
         <h2><span class="chip">⏱</span> Mes simulations
           <span style="margin-left:auto;display:flex;gap:6px">
             <button id="btn-refresh-sims" class="btn btn-ghost btn-sm" title="Actualiser">↻</button>
@@ -77,9 +77,33 @@
     <div class="col">
 
       <section class="card reveal" style="--d:.08s">
+        <h2><span class="chip">2</span> Paramètres</h2>
+        <div class="grid-3">
+          <div class="field"><label>Typo</label>
+            <input id="typo" readonly placeholder="—"/></div>
+          <div class="field"><label>Site</label>
+            <input id="site" readonly placeholder="—"/></div>
+          <div class="field"><label>Date d'embauche</label>
+            <input id="hire-date" type="date" readonly/></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Mois de référence *</label>
+            <div class="month-picker">
+              <select id="ref-month"></select>
+              <select id="ref-year"></select>
+            </div>
+            <span class="muted small">Ancienneté calculée à la fin de ce mois.</span></div>
+          <div class="field"><label>Base d'heures *</label>
+            <input id="base-heures" type="number" min="1" step="0.5"/>
+            <span class="muted small" id="base-heures-info"></span></div>
+        </div>
+      </section>
+
+      <section class="card reveal" style="--d:.1s">
         <h2><span class="chip">3</span> Activités du mois
           <span class="muted small" id="act-count" style="margin-left:auto"></span></h2>
-        <p class="muted small">Prime = Σ [ (montant base × heures activité) ÷ base d'heures ].</p>
+        <p class="muted small">ID d'activité → MSA automatique ·
+           Prime = Σ [ (montant base × heures activité) ÷ base d'heures ].</p>
         <div id="activites"></div>
         <div class="act-toolbar">
           <button id="btn-add-act" class="btn btn-ghost btn-sm">＋ Activité</button>
@@ -88,22 +112,6 @@
         <div class="calc-row">
           <button id="btn-calculate" class="btn btn-primary">✨ Calculer ma prime</button>
           <button id="btn-reset" class="btn btn-ghost">🔄 Nouvelle simulation</button>
-        </div>
-      </section>
-
-      <section class="card reveal" style="--d:.2s" id="result-card">
-        <h2><span class="chip">4</span> Résultat de la simulation</h2>
-        <div id="result-placeholder">
-          <div class="ph-steps">
-            <div class="ph-step"><b>1.</b> Recherchez le matricule du collaborateur</div>
-            <div class="ph-step"><b>2.</b> Renseignez la base d'heures, les activités et les heures</div>
-            <div class="ph-step"><b>3.</b> Sélectionnez les profils des 3 derniers mois</div>
-            <div class="ph-step"><b>4.</b> Lancez le calcul — le détail s'affichera ici</div>
-          </div>
-          <div class="ph-profils" id="ph-profils"></div>
-          <div class="ph-formule">
-            Prime = Σ [ (Montant base × heures activité) ÷ base d'heures ]
-          </div>
         </div>
       </section>
 
