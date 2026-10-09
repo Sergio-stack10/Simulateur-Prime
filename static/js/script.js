@@ -5,7 +5,27 @@
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
-const REF = {};
+const REF = {};                 // { "W0ZRVV": {msa, libelle} }
+
+/* Code couleur des profils (blocs + pastilles) */
+const PROFILE_CLASSES = {
+  "Leader": "pc-green", "Challenger": "pc-green",
+  "Fragile": "pc-orange",
+  "Care": "pc-red",
+  "Non évalué": "pc-gray",
+};
+function colorProfiles(cardEl) {
+  cardEl.querySelectorAll(".profile-cell").forEach((cell) => {
+    const sel = cell.querySelector("select");
+    cell.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
+    const cls = sel && PROFILE_CLASSES[sel.value];
+    if (cls) cell.classList.add(cls);
+  });
+}
+function profilBadgeHTML(name) {
+  const cls = PROFILE_CLASSES[name];
+  return cls ? `<span class="pchip ${cls}">${esc(name)}</span>` : `<b>${esc(name)}</b>`;
+}
 let employee = null;
 const MAX_ACT = 7;
 let placeholderResult = "", placeholderRules = "";
@@ -147,7 +167,7 @@ function fillPhProfils() {
   const ph = $("#ph-profils");
   if (!ph) return;
   ph.innerHTML = Object.entries(PP.profils).map(([c, p]) =>
-    `<span class="bchip">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
+    `<span class="pchip ${PROFILE_CLASSES[c] || "pc-gray"}">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`).join("");
 }
 async function logout() {
   try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {}
@@ -246,8 +266,11 @@ function addActivity(activityId = "") {
     div.remove(); refreshActs();
   };
   div.querySelector(".a-heures").addEventListener("input", refreshActs);
+  div.querySelectorAll(".profile-row select").forEach((sel) =>
+    sel.addEventListener("change", () => colorProfiles(div)));
   cont.appendChild(div);
   resolve();
+  colorProfiles(div);
   updateMonthLabels();
 }
 
@@ -423,7 +446,7 @@ function renderResult(d) {
         <p class="small"><b>Conditions :</b> ${esc(conditions(a))}</p>
         <p class="small"><b>Mois comptés (${a.nb_mois_profil}) :</b>
           ${(a.detail_points || []).filter((p) => p.pris_en_compte)
-            .map((p) => `${mm[p.mois] || p.mois} : ${esc(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`)
+            .map((p) => `${p.mois} : ${profilBadgeHTML(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`)
             .join(" · ")}</p>
         ${a.nb_mois_profil < 3 && (d.anciennete_mois >= 4 && d.anciennete_mois <= 6)
           ? `<p class="small"><b>Nouvel intégrant (4-6 mois) :</b> 1er mois non compté.</p>` : ""}
