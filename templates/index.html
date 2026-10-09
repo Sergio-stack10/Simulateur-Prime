@@ -24,10 +24,10 @@
 <main class="app-main">
   <div class="layout-grid">
 
-    <!-- ══════════ COLONNE GAUCHE ══════════ -->
+    <!-- ════════ COLONNE GAUCHE ════════ -->
     <div class="col">
 
-      <section class="card reveal" style="--d:.04s">
+      <section class="card reveal" style="--d:0s">
         <h2><span class="chip">1</span> Informations collaborateur</h2>
         <div class="search-bar">
           <input id="matricule" type="text" autocomplete="off"
@@ -37,27 +37,24 @@
         <div id="employee-result"></div>
       </section>
 
-      <section class="card reveal" style="--d:.12s" id="result-card">
+      <section class="card reveal" style="--d:.05s" id="result-card">
         <h2><span class="chip">4</span> Résultats de la simulation</h2>
         <div class="ph-steps">
-          <div class="ph-step"><b>1.</b> Recherchez le matricule — les paramètres se remplissent</div>
+          <div class="ph-step"><b>1.</b> Recherchez le matricule</div>
           <div class="ph-step"><b>2.</b> Choisissez le mois de référence</div>
-          <div class="ph-step"><b>3.</b> Renseignez activités, heures et profils</div>
+          <div class="ph-step"><b>3.</b> Renseignez activités, heures, profils</div>
           <div class="ph-step"><b>4.</b> Lancez le calcul</div>
         </div>
         <div class="ph-profils" id="ph-profils"></div>
-        <div class="ph-formule">
-          Prime = Σ [ (Montant base × heures activité) ÷ base d'heures ]
-        </div>
+        <div class="ph-formule">Prime = Σ [ (Montant base × heures activité) ÷ base d'heures ]</div>
       </section>
 
-      <section class="card reveal" style="--d:.16s" id="rules-card">
+      <section class="card reveal" style="--d:.08s" id="rules-card">
         <h2><span class="chip">§</span> Règles du payplan appliquées</h2>
-        <p class="muted small">Les règles appliquées à chaque activité s'afficheront ici
-           après le calcul (cliquez sur une activité pour le détail).</p>
+        <p class="muted small">Le détail par activité s'affichera ici après le calcul.</p>
       </section>
 
-      <section class="card reveal" style="--d:.2s">
+      <section class="card reveal" style="--d:.1s">
         <h2><span class="chip">⏱</span> Mes simulations
           <span style="margin-left:auto;display:flex;gap:6px">
             <button id="btn-refresh-sims" class="btn btn-ghost btn-sm" title="Actualiser">↻</button>
@@ -73,10 +70,10 @@
 
     </div>
 
-    <!-- ══════════ COLONNE DROITE ══════════ -->
+    <!-- ════════ COLONNE DROITE ════════ -->
     <div class="col">
 
-      <section class="card reveal" style="--d:.08s">
+      <section class="card reveal" style="--d:.02s">
         <h2><span class="chip">2</span> Paramètres</h2>
         <div class="grid-3">
           <div class="field"><label>Typo</label>
@@ -91,22 +88,19 @@
             <div class="month-picker">
               <select id="ref-month"></select>
               <select id="ref-year"></select>
-            </div>
-            <span class="muted small">Ancienneté calculée à la fin de ce mois.</span></div>
+            </div></div>
           <div class="field"><label>Base d'heures *</label>
             <input id="base-heures" type="number" min="1" step="0.5"/>
             <span class="muted small" id="base-heures-info"></span></div>
         </div>
       </section>
 
-      <section class="card reveal" style="--d:.1s">
+      <section class="card reveal" style="--d:.04s">
         <h2><span class="chip">3</span> Activités du mois
           <span class="muted small" id="act-count" style="margin-left:auto"></span></h2>
-        <p class="muted small">ID d'activité → MSA automatique ·
-           Prime = Σ [ (montant base × heures activité) ÷ base d'heures ].</p>
         <div id="activites"></div>
         <div class="act-toolbar">
-          <button id="btn-add-act" class="btn btn-ghost btn-sm">＋ Activité</button>
+          <button id="btn-add-act" class="btn btn-ghost btn-sm">＋ Ajouter une activité</button>
           <span class="muted small" id="act-total-h"></span>
         </div>
         <div class="calc-row">
