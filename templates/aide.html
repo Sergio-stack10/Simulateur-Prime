@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Aide — Mode opératoire</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body class="app-page">
+
+<nav class="topbar">
+  <div class="brand">
+    <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo"/>
+    <span class="brand-title">Calculateur de prime de régularité — Aide</span>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-ghost btn-sm" href="/">← Simulateur</a>
+    {% if role == 'admin' %}<a class="btn btn-ghost btn-sm" href="/admin">⚙ Admin</a>{% endif %}
+    <span class="badge-role">{{ 'ADMIN' if role == 'admin' else 'UTILISATEUR' }}</span>
+    <button id="btn-logout" class="btn btn-ghost btn-sm">Déconnexion</button>
+  </div>
+</nav>
+
+<main class="aide-main">
+
+  <section class="card reveal">
+    <h2><span class="chip">📖</span> Mode opératoire du simulateur</h2>
+
+    <div class="help-step"><span class="hs-num">1</span>
+      <div><b>Identifier le collaborateur</b><br/>
+      Saisissez son <b>matricule WKD</b> (ex : 102573627) ou son <b>matricule paie</b>
+      (ex : W14503), puis cliquez sur 🔍. La typologie (TECH / SIMPLE), le site,
+      la date d'embauche et son MSA se remplissent automatiquement.</div></div>
+
+    <div class="help-step"><span class="hs-num">2</span>
+      <div><b>Choisir le mois de paie</b><br/>
+      Le mois de paie est le mois <b>M+1</b> du mois de performance.
+      Exemple : paie <b>Octobre</b> → performance <b>Septembre</b>.
+      La <b>base d'heures</b> se calcule automatiquement sur le mois de performance
+      (jours ouvrés × 8 h) — elle reste modifiable.</div></div>
+
+    <div class="help-step"><span class="hs-num">3</span>
+      <div><b>Renseigner les activités du mois</b><br/>
+      Pour chaque activité : le champ <b>ID de l'activité</b> propose la liste des
+      activités du MSA du collaborateur (tapez ou choisissez — toute autre ID reste
+      possible). L'MSA s'affiche automatiquement en vert. Saisissez les
+      <b>heures passées</b> sur l'activité (0 autorisé), puis les
+      <b>profils des 3 derniers mois</b> (mois de performance et les 2 précédents).</div></div>
+
+    <div class="help-step"><span class="hs-num">4</span>
+      <div><b>Comprendre le calcul</b><br/>
+      Points par profil :
+      <span class="pchip pc-green">Leader · 3</span>
+      <span class="pchip pc-green">Challenger · 3</span>
+      <span class="pchip pc-orange">Fragile · 1</span>
+      <span class="pchip pc-red">Care · 0</span>
+      <span class="pchip pc-gray">Non évalué · vide</span><br/>
+      <b>Règles appliquées :</b><br/>
+      • <b>Dégradation</b> : si le profil du dernier mois est en baisse par rapport au
+      mois précédent, ses points ne sont pas comptés (Leader-Leader-Fragile → 6 pts).<br/>
+      • <b>Nouveaux intégrants</b> (ancienneté 4 à 6 mois) : le profil du 1ᵉʳ mois
+      n'est pas pris en compte (2 mois comptés).<br/>
+      • <b>Montant base</b> : déterminé par le payplan selon le site, le MSA, la date
+      d'embauche (pivot 01/06/2023), l'ancienneté et le total de points. Un collaborateur
+      TECH embauché après le pivot prend la règle générale de son site (ANTA / TMM).<br/>
+      • <b>Prorata</b> : Prime = Σ [ montant base × (heures de l'activité ÷ base d'heures) ].</div></div>
+
+    <div class="help-step"><span class="hs-num">5</span>
+      <div><b>Lire les résultats</b><br/>
+      Le tableau détaille chaque activité (heures, points, montant base, montant
+      proratisé). Les <b>Règles du payplan appliquées</b> s'affichent en dessous :
+      cliquez sur une activité pour voir ses conditions, les mois comptés,
+      le barème complet et la formule du prorata.</div></div>
+
+    <div class="help-note">💡 Les simulations sont enregistrées dans
+      <b>Mes simulations</b> (propres à votre session). Utilisez
+      <b>🔄 Nouvelle simulation</b> pour tout réinitialiser.</div>
+  </section>
+
+  {% if role == 'admin' %}
+  <section class="card reveal" style="--d:.08s">
+    <h2><span class="chip">⚙</span> Pour les administrateurs</h2>
+
+    <div class="help-step"><span class="hs-num">⬆</span>
+      <div><b>Extraction ACTIF</b><br/>
+      Glissez-déposez le fichier <code>ACTIF.xlsx</code> (ou cliquez). Il alimente la
+      recherche par matricule : nom, poste, site, MSA, date d'embauche.
+      À recharger à chaque nouvelle extraction.</div></div>
+
+    <div class="help-step"><span class="hs-num">🔗</span>
+      <div><b>Référentiel Activités ↔ MSA</b><br/>
+      Fait le lien entre chaque <b>ID d'activité</b> (ex : W0ZRVV) et son <b>MSA</b>
+      (ex : WHFR2729) + libellé. Importable depuis un Excel à 3 colonnes
+      (MSA · Activités · ID activité), ou éditable ligne par ligne.
+      C'est lui qui alimente l'autocomplétion du simulateur.</div></div>
+
+    <div class="help-step"><span class="hs-num">⚙</span>
+      <div><b>Payplan</b><br/>
+      Importable depuis la matrice Excel (colonnes Date · Avant · Après · Site · MSA ·
+      Anc_min · Anc_max · Pts_min · Pts_max · Montant · Index ; cellule
+      <code>*</code> = vide/tous). Modifiable aussi règle par règle (barèmes en
+      paliers « de → à points »). Les changements s'appliquent immédiatement
+      aux calculs — sans redéploiement. Vos saisies ne sont jamais écrasées
+      automatiquement.</div></div>
+
+    <div class="help-step"><span class="hs-num">🗂</span>
+      <div><b>Historique & export</b><br/>
+      Toutes les simulations (toutes sessions), filtrables et exportables en CSV.</div></div>
+  </section>
+  {% endif %}
+
+</main>
+
+<div id="toasts"></div>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("btn-logout").onclick = async () => {
+      try { await fetch("/api/auth/logout", { method: "POST" }); } catch (e) {}
+      location.href = "/login";
+    };
+  });
+</script>
+</body>
+</html>
