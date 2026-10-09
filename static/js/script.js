@@ -1,10 +1,15 @@
 /* ============================================================
-   SimuPrime v12.1 — script.js COMPLET (avec code couleur profils)
+   SimuPrime v12.2 — script.js COMPLET
+   Mois de référence · base d'heures auto · Care/Challenger ·
+   code couleur profils · placeholders restaurés
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
 const PP = { profils: {}, regles: [] };
-const REF = {};
+const REF = {};                 // { "W0ZRVV": {msa, libelle} }
+let employee = null;
+const MAX_ACT = 7;
+let placeholderResult = "", placeholderRules = "";
 
 /* 🎨 Code couleur — couvre tous les noms (actuels + historiques BDD) */
 const PROFILE_CLASSES = {
@@ -104,6 +109,9 @@ function onRefMonthChange() { updateBaseHeures(); updateMonthLabels(); }
 
 /* ═══════════════ Initialisation ═══════════════ */
 document.addEventListener("DOMContentLoaded", async () => {
+  placeholderResult = $("#result-card").innerHTML;   // mémorise l'écran d'attente
+  placeholderRules = $("#rules-card").innerHTML;
+
   const now = new Date();
   const ms = $("#ref-month");
   MOIS_FR.forEach((m, i) => {
@@ -152,6 +160,8 @@ function resetAll() {
   onRefMonthChange();
   $("#activites").innerHTML = "";
   addActivity();
+  $("#result-card").innerHTML = placeholderResult;
+  $("#rules-card").innerHTML = placeholderRules;
   fillPhProfils();
   window.scrollTo({ top: 0, behavior: "smooth" });
   toast("Formulaire réinitialisé — nouvelle simulation prête ✨", "success");
@@ -260,7 +270,7 @@ function addActivity(activityId = "") {
   };
   div.querySelector(".a-heures").addEventListener("input", refreshActs);
 
-  /* 🎨 Couleur : appliquée au chargement + à chaque changement */
+  /* 🎨 Couleur : appliquée à la création + à chaque changement de profil */
   div.querySelectorAll(".profile-row select").forEach((sel) =>
     sel.addEventListener("change", () => colorProfiles(div)));
 
