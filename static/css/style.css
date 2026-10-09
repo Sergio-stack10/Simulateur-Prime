@@ -383,7 +383,7 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
   padding:10px 12px;font-size:.82rem;color:var(--muted);margin-top:4px}
 .modal-body .pchip{margin:2px 2px}
 
-/* ═══════════ Page d'aide ═══════════ */
+/* ═══════════ Page glossaire ═══════════ */
 .aide-main{max-width:880px;margin:16px auto 40px;padding:0 14px;
   display:flex;flex-direction:column;gap:12px}
 .aide-main .help-step{font-size:.9rem}
