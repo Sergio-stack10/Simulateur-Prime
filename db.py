@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Connexion MongoDB + helpers (v11 — les saisies Admin ne sont plus jamais écrasées)."""
+"""Connexion MongoDB + helpers (v12 — migration profils Care/Challenger)."""
 import os
 from datetime import datetime, timezone
 
@@ -10,6 +10,10 @@ from payplan_config import PAYPLAN_RULES as DEFAULT_RULES
 from payplan_config import REF_MSA_SEED
 
 REF_VERSION = 6   # ne pas toucher (conserve votre référentiel importé)
+
+# Migration v12 : renomme/ajoute les profils SANS toucher aux règles importées
+PROFILE_RENAME = {"Soutien Intense": "Care"}
+PROFILE_ENSURE = {"Challenger": 3}
 
 _client = None
 _db = None
@@ -70,21 +74,40 @@ def _rules_from_db(rules):
         out.append(r)
     return out
 
+def _migrate_profils(profils):
+    """Renomme Soutien Intense→Care, ajoute Challenger si absent.
+    Les valeurs personnalisées et les règles sont conservées."""
+    changed = False
+    out = dict(profils or {})
+    for old, new in PROFILE_RENAME.items():
+        if old in out:
+            if new not in out:
+                out[new] = out[old]
+            out.pop(old)
+            changed = True
+    for k, v in PROFILE_ENSURE.items():
+        if k not in out:
+            out[k] = v
+            changed = True
+    return out, changed
+
 def get_payplan():
-    """Seed UNIQUEMENT si absent. Ensuite, seules les sauvegardes Admin
-    (éditeur ou import Excel) modifient le payplan — jamais automatiquement."""
     db = get_db()
     doc = db.payplan.find_one({"_id": "active"})
     if not doc:
         db.payplan.replace_one(
             {"_id": "active"},
-            {"_id": "active",
-             "profils": dict(DEFAULT_PROFILE_POINTS),
+            {"_id": "active", "profils": dict(DEFAULT_PROFILE_POINTS),
              "regles": _rules_to_db(DEFAULT_RULES),
              "updated_at": datetime.now(timezone.utc)},
             upsert=True)
         return dict(DEFAULT_PROFILE_POINTS), _rules_from_db(DEFAULT_RULES)
-    return dict(doc.get("profils") or {}), _rules_from_db(doc.get("regles"))
+    profils, changed = _migrate_profils(doc.get("profils"))
+    if changed:
+        db.payplan.update_one({"_id": "active"},
+                              {"$set": {"profils": profils,
+                                        "updated_at": datetime.now(timezone.utc)}})
+    return profils, _rules_from_db(doc.get("regles"))
 
 def save_payplan(profils, regles):
     db = get_db()
