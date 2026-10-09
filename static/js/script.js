@@ -20,11 +20,10 @@ const PROFILE_CLASSES = {
 };
 function colorProfiles(cardEl) {
   (cardEl ? [cardEl] : document.querySelectorAll(".act-card")).forEach((card) => {
-    card.querySelectorAll(".profile-cell").forEach((cell) => {
-      const sel = cell.querySelector("select");
-      cell.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
-      const cls = sel && PROFILE_CLASSES[sel.value];
-      if (cls) cell.classList.add(cls);
+    card.querySelectorAll("select.profile").forEach((sel) => {
+      sel.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
+      const cls = PROFILE_CLASSES[sel.value];
+      if (cls) sel.classList.add(cls);
     });
   });
 }
