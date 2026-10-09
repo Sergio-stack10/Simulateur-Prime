@@ -390,4 +390,131 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
 .aide-main code{background:#f1f5fa;border:1px solid var(--border);border-radius:5px;
   padding:1px 6px;font-size:.82rem}
 .aide-main .pchip{margin:2px 2px}
+
+/* ═══════════════ Footer signature (toutes pages) ═══════════════ */
+.footer-fix{position:fixed;bottom:0;left:0;right:0;z-index:90;text-align:center;
+  padding:5px 10px;font-size:.74rem;letter-spacing:.02em;color:#64748b;
+  background:rgba(255,255,255,.88);backdrop-filter:blur(6px);
+  border-top:1px solid rgba(219,228,240,.75);pointer-events:none}
+.footer-fix span{font-weight:800;letter-spacing:.08em;
+  background:linear-gradient(90deg,#1e4fd6,#0891b2);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+body{padding-bottom:26px}                      /* réserve la place du footer */
+#toasts{bottom:38px}                           /* toasts au-dessus du footer */
+body.login-page .footer-fix{background:rgba(8,20,38,.6);color:#9fb4d6;
+  border-top-color:rgba(255,255,255,.12)}
+body.login-page .footer-fix span{
+  background:linear-gradient(90deg,#22d3ee,#2f6bff);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ═══════════════ Glossaire v2 ═══════════════ */
+html{scroll-behavior:smooth}
+.glo-main{max-width:920px;margin:16px auto 40px;padding:0 14px;
+  display:flex;flex-direction:column;gap:14px}
+.glo-main section[id]{scroll-margin-top:66px}   /* ancre sous la barre collante */
+
+/* Bannière */
+.glo-hero{position:relative;overflow:hidden;border-radius:16px;padding:30px 24px 26px;
+  text-align:center;color:#eaf2ff;
+  background:linear-gradient(135deg,#081426 0%,#123055 60%,#1e4fd6 130%);
+  box-shadow:0 12px 34px rgba(12,32,56,.28)}
+.glo-hero::before{content:"";position:absolute;width:300px;height:300px;border-radius:50%;
+  background:#22d3ee;filter:blur(80px);opacity:.25;top:-120px;right:-80px}
+.glo-hero::after{content:"";position:absolute;width:240px;height:240px;border-radius:50%;
+  background:#7c3aed;filter:blur(80px);opacity:.22;bottom:-120px;left:-60px}
+.glo-hero-badge{width:62px;height:62px;margin:0 auto 10px;display:grid;place-items:center;
+  font-size:1.7rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);
+  border-radius:18px;backdrop-filter:blur(4px);animation:bob 4s ease-in-out infinite}
+.glo-hero h1{font-size:1.5rem;letter-spacing:.02em;position:relative;z-index:1}
+.glo-hero h1 em{font-style:normal;
+  background:linear-gradient(90deg,#22d3ee,#7dd3fc);-webkit-background-clip:text;
+  background-clip:text;color:transparent}
+.glo-hero p{color:#9fb4d6;font-size:.92rem;margin-top:6px;position:relative;z-index:1}
+.glo-nav{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px;
+  position:relative;z-index:1}
+.glo-nav a{color:#dce8fa;text-decoration:none;font-size:.8rem;font-weight:700;
+  background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.2);
+  padding:6px 13px;border-radius:999px;transition:.15s}
+.glo-nav a:hover{background:rgba(34,211,238,.18);border-color:#22d3ee;transform:translateY(-2px)}
+
+/* Étapes */
+.glo-card{padding:18px 20px}
+.glo-steps{list-style:none;display:flex;flex-direction:column;gap:10px}
+.glo-step{display:flex;gap:14px;background:#fafcff;border:1px solid var(--border);
+  border-radius:12px;padding:12px 14px;transition:transform .15s,border-color .15s}
+.glo-step:hover{transform:translateX(4px);border-color:var(--primary)}
+.gs-badge{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+  font-weight:800;font-size:.95rem;color:#fff;
+  background:linear-gradient(135deg,var(--primary),var(--accent));
+  box-shadow:0 4px 12px rgba(47,107,255,.3)}
+.gs-body h3{font-size:.95rem;color:var(--primary-dark);margin-bottom:3px}
+.gs-body p{font-size:.86rem;color:#44536b}
+.gs-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.gtag{font-family:Consolas,monospace;font-size:.76rem;font-weight:700;color:var(--primary-dark);
+  background:#f1f5fa;border:1px solid var(--border);border-radius:6px;padding:2px 8px}
+
+/* Cartes profils */
+.glo-profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.gprof{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;
+  border-radius:12px;padding:14px 10px;border:1.5px solid;transition:transform .15s}
+.gprof:hover{transform:translateY(-3px)}
+.gprof b{font-size:.95rem}
+.gprof small{font-size:.72rem;color:var(--muted)}
+.gp-emoji{font-size:1.5rem}
+.gp-pts{font-size:.75rem;font-weight:800;border-radius:999px;padding:2px 12px;
+  background:#fff;border:1.5px solid}
+.gprof.g-green{background:#f0fdf4;border-color:#86efac}
+.gprof.g-green .gp-pts{color:#15803d;border-color:#16a34a}
+.gprof.g-orange{background:#fffbeb;border-color:#fcd34d}
+.gprof.g-orange .gp-pts{color:#b45309;border-color:#e08c0d}
+.gprof.g-red{background:#fef2f2;border-color:#fca5a5}
+.gprof.g-red .gp-pts{color:#b91c1c;border-color:#dc2626}
+.gprof.g-gray{background:#f1f5f9;border-color:#cbd5e1}
+.gprof.g-gray .gp-pts{color:#64748b;border-color:#94a3b8}
+
+/* Encadrés règles */
+.glo-rule{border-radius:12px;border:1.5px solid;border-left-width:5px;
+  padding:12px 15px;margin-bottom:10px}
+.glo-rule h3{font-size:.92rem;margin-bottom:4px}
+.glo-rule p{font-size:.86rem;color:#44536b}
+.glo-rule.g-orange{background:#fffbf2;border-color:#f0dcae}
+.glo-rule.g-orange h3{color:#b45309}
+.glo-rule.g-blue{background:#f0f7ff;border-color:#b6d4f5}
+.glo-rule.g-blue h3{color:#1d4ed8}
+.glo-rule.g-violet{background:#f7f3ff;border-color:#ddd0f7}
+.glo-rule.g-violet h3{color:#6d28d9}
+.gex{display:inline-block;font-family:Consolas,monospace;font-size:.84rem;
+  background:#fff;border:1px solid var(--border);border-radius:8px;
+  padding:6px 12px;margin-top:8px;color:#17233b}
+.gex b{color:var(--primary-dark)}
+.gex s{color:#dc2626}
+.gex-formule{font-weight:700;color:var(--primary-dark);
+  background:linear-gradient(90deg,#f1f5fa,#ecfeff)}
+
+/* Astuces */
+.glo-tips{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.gtip{display:flex;flex-direction:column;gap:4px;background:#fafcff;
+  border:1px dashed var(--border);border-radius:12px;padding:12px 14px;
+  transition:border-color .15s,transform .15s}
+.gtip:hover{border-color:var(--accent);transform:translateY(-2px)}
+.gtip b{font-size:.87rem;color:var(--primary-dark)}
+.gtip span{font-size:.8rem;color:#44536b}
+
+/* Admin */
+.glo-admin{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.gadm{display:flex;flex-direction:column;gap:4px;border-radius:12px;padding:14px;
+  border:1.5px solid;transition:transform .15s}
+.gadm:hover{transform:translateY(-3px)}
+.gadm span{font-size:1.3rem}
+.gadm b{font-size:.9rem}
+.gadm small{font-size:.76rem;color:#5b6b80}
+.gadm.adm-blue{background:#f0f7ff;border-color:#b6d4f5}
+.gadm.adm-cyan{background:#effcfb;border-color:#99e9f2}
+.gadm.adm-violet{background:#f7f3ff;border-color:#ddd0f7}
+.gadm.adm-gold{background:#fffbf2;border-color:#f0dcae}
+
+@media (max-width:640px){
+  .glo-step{flex-direction:column;gap:8px}
+  .glo-hero{padding:22px 14px}
+}
 }
