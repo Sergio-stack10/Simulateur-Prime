@@ -10,7 +10,7 @@
 
 PROFILE_POINTS = {
     "Leader": 3,
-    "Challenger": 3,
+    "Challenger": 2,
     "Fragile": 1,
     "Care": 0,
     "Non évalué": None,     # None = vide : aucun point
