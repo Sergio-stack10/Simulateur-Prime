@@ -264,7 +264,6 @@ select.profile.pc-yellow{border-color:#d4a500;background:#fefce8;
 
 /* Renfort 2 : CSS pur (aucune dépendance au JS) */
 select.profile:has(option[value="Leader"]:checked),
-select.profile:has(option[value="Challenger"]:checked),
 select.profile:has(option[value="L"]:checked){border-color:#16a34a;
   background:#f0fdf4;color:#14532d;font-weight:700}
 select.profile:has(option[value="Fragile"]:checked),
@@ -491,6 +490,8 @@ html{scroll-behavior:smooth}
 .gprof.g-red .gp-pts{color:#b91c1c;border-color:#dc2626}
 .gprof.g-gray{background:#f1f5f9;border-color:#cbd5e1}
 .gprof.g-gray .gp-pts{color:#64748b;border-color:#94a3b8}
+.gprof.g-yellow{background:#fefce8;border-color:#fde047}
+.gprof.g-yellow .gp-pts{color:#a16207;border-color:#eab308}
 
 /* Encadrés règles */
 .glo-rule{border-radius:12px;border:1.5px solid;border-left-width:5px;
