@@ -391,12 +391,30 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
   padding:1px 6px;font-size:.82rem}
 .aide-main .pchip{margin:2px 2px}
 
-/* ===== Signature discrète en bas à droite (copie appli RAVO SERGIO) ===== */
-:root{--teal:#22d3ee}
-.footer-fix{position:fixed;right:14px;bottom:8px;width:auto;background:transparent;
-  color:#8aa9b8;font-size:9px;padding:4px 6px;z-index:9998;border:none;
-  box-shadow:none;border-radius:0}
-.footer-fix span{color:var(--teal);font-weight:700;letter-spacing:1px}
+/* ═══════════ Signature développeur — bas droite, discret ═══════════ */
+.footer-fix{
+  position:fixed;
+  bottom:10px;
+  right:20px;
+  z-index:9998;
+  background:transparent;
+  border:none;
+  box-shadow:none;
+  border-radius:0;
+  padding:4px 6px;
+  cursor:default;
+  user-select:none;
+  font-size:11px;
+  font-weight:300;          /* police fine et moderne */
+  letter-spacing:.3px;
+  color:#A0AEC0;            /* gris discret/estompé */
+}
+.footer-fix span{
+  font-weight:bold;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:#00D1B2;            /* turquoise (accentuation) */
+}
 
 /* Sur la page de connexion (fond sombre) : pastille sombre */
 body.login-page .footer-fix{background:rgba(12,32,56,.72);
