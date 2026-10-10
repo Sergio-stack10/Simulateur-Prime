@@ -258,9 +258,9 @@ select.profile.pc-red{border-color:#dc2626;background:#fef2f2;
   color:#7f1d1d;font-weight:700}
 select.profile.pc-gray{border-color:#94a3b8;background:#f1f5f9;
   color:#64748b;font-weight:700}
-select.profile.pc-yellow{border-color:#eae608;background:#fef9c3;
+select.profile.pc-yellow{border-color:#eab308;background:#fef9c3;
   color:#713f12;font-weight:700}
-.pchip.pc-yellow{background:#fef9c3;color:#713f12;border-color:#eae608}
+.pchip.pc-yellow{background:#fef9c3;color:#713f12;border-color:#eab308}
 
 /* Renfort 2 : CSS pur (aucune dépendance au JS) */
 select.profile:has(option[value="Leader"]:checked),
@@ -490,8 +490,8 @@ html{scroll-behavior:smooth}
 .gprof.g-red .gp-pts{color:#b91c1c;border-color:#dc2626}
 .gprof.g-gray{background:#f1f5f9;border-color:#cbd5e1}
 .gprof.g-gray .gp-pts{color:#64748b;border-color:#94a3b8}
-.gprof.g-yellow{background:#fefce8;border-color:#fde047}
-.gprof.g-yellow .gp-pts{color:#a16207;border-color:#ead308}
+.gprof.g-yellow{background:#fef9c3;border-color:#eab308}
+.gprof.g-yellow .gp-pts{color:#713f12;border-color:#ca8a04}
 
 /* Encadrés règles */
 .glo-rule{border-radius:12px;border:1.5px solid;border-left-width:5px;
@@ -538,4 +538,4 @@ html{scroll-behavior:smooth}
   .glo-step{flex-direction:column;gap:8px}
   .glo-hero{padding:22px 14px}
 }
-}s
+}
