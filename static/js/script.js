@@ -15,23 +15,29 @@ let placeholderResult = "", placeholderRules = "";
 
 /* ═══════════ 🎨 CODE COULEUR DES PROFILS ═══════════ */
 const COLOR_STYLES = {
-  green:  { bg: "#f0fdf4", border: "#16a34a", fg: "#14532d" },
-  orange: { bg: "#fffbeb", border: "#e08c0d", fg: "#7c4a03" },
-  red:    { bg: "#fef2f2", border: "#dc2626", fg: "#7f1d1d" },
-  gray:   { bg: "#f1f5f9", border: "#94a3b8", fg: "#64748b" },
+  green:  { bg: "#f0fdf4", border: "#16a34a", fg: "#14532d" },   // 3 pts et +
+  yellow: { bg: "#fefce8", border: "#d4a500", fg: "#854d0e" },   // 2 pts
+  orange: { bg: "#fffbeb", border: "#e08c0d", fg: "#7c4a03" },   // 1 pt
+  red:    { bg: "#fef2f2", border: "#dc2626", fg: "#7f1d1d" },   // 0 pt
+  gray:   { bg: "#f1f5f9", border: "#94a3b8", fg: "#64748b" },   // vide
 };
 function colorForProfile(name) {
   if (!name) return null;
+  /* 1) Par POINTS du payplan — la couleur suit automatiquement
+        si vous modifiez les points (panneau Admin) */
   const pts = PP.profils[name];
   if (pts !== undefined) {
-    if (pts === null || pts === undefined) return "gray";
-    if (pts === 0) return "red";
-    if (pts === 1) return "orange";
-    if (pts >= 2) return "green";
+    if (pts === null || pts === undefined) return "gray";   // Non évalué
+    if (pts >= 3) return "green";    // ex : Leader 3
+    if (pts === 2) return "yellow";  // ex : Challenger 2
+    if (pts === 1) return "orange";  // ex : Fragile 1
+    if (pts === 0) return "red";     // ex : Care 0
   }
+  /* 2) Fallback par nom (uniquement si le profil est absent du payplan) */
   const n = String(name).trim().toLowerCase().normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  if (/(leader|challeng|^l$)/.test(n)) return "green";
+  if (/(leader|^l$)/.test(n)) return "green";
+  if (/(challeng)/.test(n)) return "yellow";
   if (/(fragile|^f$)/.test(n)) return "orange";
   if (/(care|soutien|^si$)/.test(n)) return "red";
   if (/(non|evalue|vide)/.test(n)) return "gray";
