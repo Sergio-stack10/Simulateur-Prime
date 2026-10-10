@@ -329,7 +329,7 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
 .sims-toolbar input{flex:1;min-width:200px}
 
 /* ---------------- Toasts ---------------- */
-#toasts{position:fixed;bottom:14px;right:14px;z-index:100;
+#toasts{position:fixed;bottom:52px;right:14px;z-index:100;
   display:flex;flex-direction:column;gap:8px}
 .toast{background:#0c2038;color:#eaf2ff;padding:10px 14px;border-radius:10px;
   box-shadow:0 8px 24px rgba(0,0,0,.3);animation:toastIn .25s;max-width:330px;
@@ -391,20 +391,30 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
   padding:1px 6px;font-size:.82rem}
 .aide-main .pchip{margin:2px 2px}
 
-/* ═══════════════ Footer signature (toutes pages) ═══════════════ */
-.footer-fix{position:fixed;bottom:0;left:0;right:0;z-index:90;text-align:center;
-  padding:5px 10px;font-size:.74rem;letter-spacing:.02em;color:#64748b;
-  background:rgba(255,255,255,.88);backdrop-filter:blur(6px);
-  border-top:1px solid rgba(219,228,240,.75);pointer-events:none}
-.footer-fix span{font-weight:800;letter-spacing:.08em;
+/* ═══════════════ Signature — coin bas-droite, flottante (toutes pages) ═══════════════ */
+.footer-fix{position:fixed;bottom:14px;right:14px;z-index:95;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 16px;border-radius:999px;cursor:default;user-select:none;
+  font-size:.75rem;letter-spacing:.03em;color:#64748b;font-weight:500;
+  background:rgba(255,255,255,.82);backdrop-filter:blur(8px);
+  border:1px solid rgba(219,228,240,.9);
+  box-shadow:0 4px 18px rgba(12,32,56,.12);
+  transition:transform .18s,box-shadow .18s,border-color .18s}
+.footer-fix:hover{transform:translateY(-2px);
+  box-shadow:0 8px 26px rgba(12,32,56,.18);border-color:#b6d4f5}
+.footer-fix::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;
+  background:linear-gradient(135deg,#22d3ee,#2f6bff);
+  box-shadow:0 0 8px rgba(34,211,238,.7)}
+.footer-fix span{font-weight:800;letter-spacing:.09em;
   background:linear-gradient(90deg,#1e4fd6,#0891b2);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-body{padding-bottom:26px}                      /* réserve la place du footer */
-#toasts{bottom:38px}                           /* toasts au-dessus du footer */
-body.login-page .footer-fix{background:rgba(8,20,38,.6);color:#9fb4d6;
-  border-top-color:rgba(255,255,255,.12)}
+
+/* Sur la page de connexion (fond sombre) : pastille sombre */
+body.login-page .footer-fix{background:rgba(12,32,56,.72);
+  border-color:rgba(255,255,255,.18);color:#9fb4d6;
+  box-shadow:0 4px 20px rgba(0,0,0,.4)}
 body.login-page .footer-fix span{
-  background:linear-gradient(90deg,#22d3ee,#2f6bff);
+  background:linear-gradient(90deg,#22d3ee,#7dd3fc);
   -webkit-background-clip:text;background-clip:text;color:transparent}
 
 /* ═══════════════ Glossaire v2 ═══════════════ */
