@@ -13,7 +13,7 @@ REF_VERSION = 6   # ne pas toucher (conserve votre référentiel importé)
 
 # Migration v12 : renomme/ajoute les profils SANS toucher aux règles importées
 PROFILE_RENAME = {"Soutien Intense": "Care"}
-PROFILE_ENSURE = {"Challenger": 3}
+PROFILE_ENSURE = {"Challenger": 2}
 
 _client = None
 _db = None
