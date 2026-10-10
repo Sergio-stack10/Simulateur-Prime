@@ -15,7 +15,7 @@ let placeholderResult = "", placeholderRules = "";
 
 /* ═══════════ 🎨 CODE COULEUR DES PROFILS ═══════════ */
 const COLOR_STYLES = {
-  green:  { bg: "#f0fdf4", border: "#16a34a", fg: "#14532d" },   // 3 pts et +
+  green:  { bg: "#dcfce7", border: "#15803d", fg: "#166534" },   // 3 pts et +
   yellow: { bg: "#fef9c3", border: "#eab308", fg: "#713f12" },   // 2 pts — jaune vif
   orange: { bg: "#ffedd5", border: "#ea580c", fg: "#7c2d12" },   // 1 pt — orange soutenu
   red:    { bg: "#fef2f2", border: "#dc2626", fg: "#7f1d1d" },   // 0 pt
