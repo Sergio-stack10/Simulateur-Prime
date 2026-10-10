@@ -329,7 +329,7 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
 .sims-toolbar input{flex:1;min-width:200px}
 
 /* ---------------- Toasts ---------------- */
-#toasts{position:fixed;bottom:52px;right:14px;z-index:100;
+#toasts{position:fixed;bottom:34px;right:14px;z-index:9997;
   display:flex;flex-direction:column;gap:8px}
 .toast{background:#0c2038;color:#eaf2ff;padding:10px 14px;border-radius:10px;
   box-shadow:0 8px 24px rgba(0,0,0,.3);animation:toastIn .25s;max-width:330px;
@@ -391,23 +391,12 @@ select.profile:has(option[value="Non évalué"]:checked){border-color:#94a3b8;
   padding:1px 6px;font-size:.82rem}
 .aide-main .pchip{margin:2px 2px}
 
-/* ═══════════════ Signature — coin bas-droite, flottante (toutes pages) ═══════════════ */
-.footer-fix{position:fixed;bottom:14px;right:14px;z-index:95;
-  display:inline-flex;align-items:center;gap:6px;
-  padding:7px 16px;border-radius:999px;cursor:default;user-select:none;
-  font-size:.75rem;letter-spacing:.03em;color:#64748b;font-weight:500;
-  background:rgba(255,255,255,.82);backdrop-filter:blur(8px);
-  border:1px solid rgba(219,228,240,.9);
-  box-shadow:0 4px 18px rgba(12,32,56,.12);
-  transition:transform .18s,box-shadow .18s,border-color .18s}
-.footer-fix:hover{transform:translateY(-2px);
-  box-shadow:0 8px 26px rgba(12,32,56,.18);border-color:#b6d4f5}
-.footer-fix::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;
-  background:linear-gradient(135deg,#22d3ee,#2f6bff);
-  box-shadow:0 0 8px rgba(34,211,238,.7)}
-.footer-fix span{font-weight:800;letter-spacing:.09em;
-  background:linear-gradient(90deg,#1e4fd6,#0891b2);
-  -webkit-background-clip:text;background-clip:text;color:transparent}
+/* ===== Signature discrète en bas à droite (copie appli RAVO SERGIO) ===== */
+:root{--teal:#22d3ee}
+.footer-fix{position:fixed;right:14px;bottom:8px;width:auto;background:transparent;
+  color:#8aa9b8;font-size:9px;padding:4px 6px;z-index:9998;border:none;
+  box-shadow:none;border-radius:0}
+.footer-fix span{color:var(--teal);font-weight:700;letter-spacing:1px}
 
 /* Sur la page de connexion (fond sombre) : pastille sombre */
 body.login-page .footer-fix{background:rgba(12,32,56,.72);
