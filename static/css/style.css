@@ -258,9 +258,9 @@ select.profile.pc-red{border-color:#dc2626;background:#fef2f2;
   color:#7f1d1d;font-weight:700}
 select.profile.pc-gray{border-color:#94a3b8;background:#f1f5f9;
   color:#64748b;font-weight:700}
-select.profile.pc-yellow{border-color:#d4a500;background:#fefce8;
-  color:#854d0e;font-weight:700}
-.pchip.pc-yellow{background:#fefce8;color:#a16207;border-color:#fde047}
+select.profile.pc-yellow{border-color:#eae608;background:#fef9c3;
+  color:#713f12;font-weight:700}
+.pchip.pc-yellow{background:#fef9c3;color:#713f12;border-color:#eae608}
 
 /* Renfort 2 : CSS pur (aucune dépendance au JS) */
 select.profile:has(option[value="Leader"]:checked),
@@ -491,7 +491,7 @@ html{scroll-behavior:smooth}
 .gprof.g-gray{background:#f1f5f9;border-color:#cbd5e1}
 .gprof.g-gray .gp-pts{color:#64748b;border-color:#94a3b8}
 .gprof.g-yellow{background:#fefce8;border-color:#fde047}
-.gprof.g-yellow .gp-pts{color:#a16207;border-color:#eab308}
+.gprof.g-yellow .gp-pts{color:#a16207;border-color:#ead308}
 
 /* Encadrés règles */
 .glo-rule{border-radius:12px;border:1.5px solid;border-left-width:5px;
