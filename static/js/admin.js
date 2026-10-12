@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $("#btn-refresh-admin-sims").onclick = loadSims;
   $("#btn-export-csv").onclick = () => exportCSV(allSims);
+  $("#btn-clear-all-sims").onclick = clearAllSims;
   $("#sims-search").oninput = renderSims;
 
   await Promise.all([loadStats(), loadPayplan(), loadRef(), loadSims()]);
@@ -317,8 +318,9 @@ function renderSims() {
       <td>${esc(r.site || "")}</td>
       <td>${esc(acts || "—")}<br/><span class="muted small">${pts ?? ""} pts</span></td>
       <td>${r.montant_prime != null ? fmt.format(r.montant_prime) + " Ar" : "—"}</td>
-      <td>${r.eligible ? '<span class="badge ok">Éligible</span>' : '<span class="badge">Non</span>'}</td></tr>`;
-  }).join("") || `<tr><td colspan="7" class="muted center">Aucune simulation.</td></tr>`;
+      <td>${r.eligible ? '<span class="badge ok">Éligible</span>' : '<span class="badge">Non</span>'}</td>
+      <td>${r.id ? `<button class="btn btn-danger btn-sm" title="Supprimer"
+          onclick="deleteSimAdmin('${r.id}')">🗑</button>` : ""}</td></tr>`;  }).join("") || `<tr><td colspan="7" class="muted center">Aucune simulation.</td></tr>`;
   $("#sims-count").textContent = rows.length + " ligne(s)";
 }
 function exportCSV(rows) {
@@ -339,4 +341,20 @@ function exportCSV(rows) {
   a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
   a.download = "simulations.csv"; a.click();
   toast("Export CSV téléchargé.", "success");
+}
+async function deleteSimAdmin(id) {
+  if (!confirm("Supprimer cette simulation ?")) return;
+  try {
+    const j = await api("/api/simulations/" + id, { method: "DELETE" });
+    if (j.ok) { toast(j.message, "success"); await loadSims(); }
+    else toast(j.error, "error");
+  } catch (e) {}
+}
+async function clearAllSims() {
+  if (!confirm("Vider TOUT l'historique des simulations (toutes sessions) ? Action irréversible.")) return;
+  try {
+    const j = await api("/api/simulations/all", { method: "DELETE" });
+    if (j.ok) { toast(j.message, "success"); await loadSims(); }
+    else toast(j.error, "error");
+  } catch (e) {}
 }
