@@ -558,7 +558,9 @@ async function loadMySims() {
       return `<tr><td>${new Date(r.created_at).toLocaleString("fr-FR")}</td>
         <td>${esc(r.matricule || "—")}</td><td>${esc(r.site || "")}</td>
         <td>${esc(acts || "—")}</td>
-        <td>${r.montant_prime ? fmt.format(r.montant_prime) + " Ar" : "—"}</td></tr>`;
+        <td>${r.montant_prime ? fmt.format(r.montant_prime) + " Ar" : "—"}</td>
+        <td>${r.id ? `<button class="btn btn-danger btn-sm" title="Supprimer cette simulation"
+          onclick="deleteSim('${r.id}')">🗑</button>` : ""}</td></tr>`;
     }).join("");
     $("#my-sims-body").innerHTML = rows ||
       `<tr><td colspan="5" class="muted center">Aucune simulation pour le moment.</td></tr>`;
@@ -569,5 +571,13 @@ async function clearMySims() {
   try {
     const j = await api("/api/simulations/mine", { method: "DELETE" });
     if (j.ok) { toast(j.message, "success"); await loadMySims(); }
+  } catch (e) {}
+}
+async function deleteSim(id) {
+  if (!confirm("Supprimer cette simulation ?")) return;
+  try {
+    const j = await api("/api/simulations/" + id, { method: "DELETE" });
+    if (j.ok) { toast(j.message, "success"); await loadMySims(); }
+    else toast(j.error, "error");
   } catch (e) {}
 }
