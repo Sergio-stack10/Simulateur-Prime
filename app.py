@@ -674,8 +674,38 @@ def api_simulations():
     except ValueError:
         limit = 20
     q = {} if (u["role"] == "admin" and scope == "all") else {"sid": u["sid"]}
-    cur = get_db().simulations.find(q, {"_id": 0}).sort("created_at", -1).limit(limit)
-    return jsonify({"ok": True, "data": list(cur)})
+    cur = get_db().simulations.find(q).sort("created_at", -1).limit(limit)
+    data = []
+    for d in cur:
+        d = dict(d)
+        d["id"] = str(d.pop("_id", ""))
+        data.append(d)
+    return jsonify({"ok": True, "data": data})
+
+@app.delete("/api/simulations/all")
+@admin_required
+def api_sim_delete_all():
+    get_db().simulations.delete_many({})
+    return jsonify({"ok": True, "message": "Historique vidé (toutes simulations)."})
+
+@app.delete("/api/simulations/<rec_id>")
+@login_required
+def api_sim_delete_one(rec_id: str):
+    from bson import ObjectId
+    from bson.errors import InvalidId
+    try:
+        oid = ObjectId(rec_id)
+    except InvalidId:
+        return jsonify({"ok": False, "error": "Identifiant invalide."}), 400
+    u = current_user()
+    filtre = {"_id": oid}
+    if u["role"] != "admin":
+        filtre["sid"] = u["sid"]          # un utilisateur ne supprime que SES sims
+    res = get_db().simulations.delete_one(filtre)
+    if res.deleted_count == 0:
+        return jsonify({"ok": False, "error": "Simulation introuvable (ou non à vous)."}), 404
+    return jsonify({"ok": True, "message": "Simulation supprimée."})
+
 
 @app.delete("/api/simulations/mine")
 @login_required
