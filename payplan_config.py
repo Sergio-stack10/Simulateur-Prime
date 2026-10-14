@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 =====================================================================
- PAYPLAN — PRIME DE RÉGULARITÉ (v16 · effet points MOIS PAR MOIS)
+ PAYPLAN — PRIME DE RÉGULARITÉ (v17 · points par MOIS + dégradation
+ sur points courants)
 =====================================================================
- · PROFILE_POINT_EFFECTS : historique des points avec date d'effet
-   (au mois de PERFORMANCE). Un profil vaut « ancien » pour tout mois
-   antérieur à date_effet, et la valeur courante (payplan/Admin/BDD)
-   à partir de ce mois — résolu MOIS PAR MOIS (M1, M2, M3 séparément).
- · PAYPLAN_RULES : seed uniquement (BDD vide / bouton reset).
- ⚠️ Montants seed = placeholders 0 : vos vrais montants vivent en BDD
-    (matrice importée via Admin).
+ · PROFILE_POINT_EFFECTS : historique des points avec date d'effet au
+   mois de PERFORMANCE. Chaque mois (M1/M2/M3) est résolu séparément :
+   un profil peut valoir 3 pts en M1/M2 et 2 pts en M3.
+ · Dégradation : comparée aux points COURANTS — un changement de barème
+   (ex : Challenger 3→2 au 01/09/2026) n'est PAS une dégradation.
+ · PAYPLAN_RULES : seed uniquement (BDD vide / reset Admin).
+ ⚠️ Montants seed = placeholders 0 : vos vrais montants vivent en BDD.
 =====================================================================
 """
 
@@ -25,25 +26,21 @@ PROFILE_POINTS = {
 }
 
 # ── Historique des points (date d'effet au mois de PERFORMANCE) ──
-# Ex : Challenger valait 3 pts pour tout mois de performance antérieur
-# à Septembre 2026 ; à partir de Sept. 2026 il vaut la valeur courante (2).
+# Un profil vaut « ancien » pour tout mois de performance antérieur à
+# date_effet ; à partir de ce mois, valeur courante du payplan.
 PROFILE_POINT_EFFECTS = [
     {"profil": "Challenger", "ancien": 3, "date_effet": "2026-09-01"},
 ]
 
 MIN_ANCIENNETE_MOIS = 4
-
-# Dernier mois compté en baisse → ses points ne sont pas comptés (L-L-F → 6)
-REGLE_DEGRADATION = True
-
-# Nouveaux intégrants (ancienneté 4 à 6 mois) : 1er mois non compté
-REGLE_NOUVEAUX_4_6 = True
+REGLE_DEGRADATION = True       # dernier mois en baisse → points non comptés
+REGLE_NOUVEAUX_4_6 = True      # ancienneté 4-6 mois : 1er mois non compté
 
 def _paliers(*triplets):
     return [{"min": a, "max": b, "montant": m} for a, b, m in triplets]
 
 # -------------------------------------------------------------------------
-# 2) RÈGLES SEED (⚠️ placeholders 0 — les vraies vivent en BDD via Admin)
+# 2) RÈGLES SEED (⚠️ placeholders 0 — vraies valeurs en BDD via Admin)
 # -------------------------------------------------------------------------
 PAYPLAN_RULES = [
     {"index": 1, "nom": "ANTA · Avant 01/06/2023 · WHFR1135 & WHFR919",
@@ -143,44 +140,23 @@ def _iso(d):
     except ValueError:
         return None
 
-# ── Résolution des points pour un mois donné ──
+# ── Historique : valeur « ancienne » d'un profil pour un mois ISO ──
 def _legacy_value(profil, mois_iso):
-    """Valeur « ancienne » d'un profil pour un mois ISO donné, si un
-    historique (PROFILE_POINT_EFFECTS) s'applique (mois < date_effet).
-    Sinon None → utiliser la valeur courante du payplan."""
+    """Retourne l'ancienne valeur si le mois (ISO YYYY-MM-DD) est
+    antérieur à la date d'effet d'un historique ; sinon None."""
     for e in PROFILE_POINT_EFFECTS:
         if e.get("profil") == profil and str(mois_iso) < str(e.get("date_effet"))[:10]:
             return e.get("ancien")
     return None
 
-def resolve_profile_points(base_profils, perf_date):
-    """Points effectifs POUR UN MOIS DE PERFORMANCE donné (résolution globale).
-    Utilisé pour l'affichage / l'ancienne API. Le calcul par mois passe
-    plutôt par _legacy_value au sein de somme_points_profils."""
-    pts = dict(base_profils or {})
-    if perf_date is None:
-        return pts
-    if isinstance(perf_date, str):
-        try:
-            perf_date = date.fromisoformat(perf_date[:10])
-        except ValueError:
-            return pts
-    debut_mois = date(perf_date.year, perf_date.month, 1)
-    iso_debut = debut_mois.isoformat()
-    for e in PROFILE_POINT_EFFECTS:
-        if iso_debut < str(e.get("date_effet"))[:10] and e.get("profil") in pts:
-            pts[e["profil"]] = e.get("ancien")
-    return pts
-
-# ── Points des profils d'une activité ──
+# ── Points des profils d'une activité (résolution MOIS PAR MOIS) ──
 def somme_points_profils(profiles, nb_mois, profile_points, month_dates=None):
     """
-    Points des N derniers mois (M3 = plus récent).
     · « Non évalué » (None) = vide → 0 point.
-    · DÉGRADATION : dernier mois en baisse → ses points non comptés.
     · month_dates = {M1: ISO, M2: ISO, M3: ISO} : chaque mois est résolu
-      SÉPARÉMENT — un profil peut valoir 3 pts en M1/M2 et 2 pts en M3
-      si la date d'effet tombe pendant le trimestre.
+      SÉPARÉMENT (Challenger peut valoir 3 pts en M1/M2 et 2 pts en M3).
+    · DÉGRADATION : comparée aux points COURANTS — un changement de
+      barème n'est PAS une dégradation (Challenger 3→3→2 : total 8).
     """
     labels = ["M1", "M2", "M3"]
     retenus = profiles if nb_mois >= len(profiles) else profiles[-nb_mois:]
@@ -208,10 +184,14 @@ def somme_points_profils(profiles, nb_mois, profile_points, month_dates=None):
                        "points": profile_points.get(p) if p in profile_points else 0,
                        "pris_en_compte": False, "note": "hors période"})
 
-    # Valeurs résolues MOIS PAR MOIS
+    # Valeurs effectives MOIS PAR MOIS (pour le total)
     counted = [pts_for_month(p, labels[offset + i]) for i, p in enumerate(retenus)]
 
-    degraded = (REGLE_DEGRADATION and len(counted) >= 2 and counted[-1] < counted[-2])
+    # Dégradation : comparaison sur points COURANTS (sans historique) —
+    # la baisse due à un changement de barème n'est pas une dégradation
+    counted_courants = [base_pts(p) for p in retenus]
+    degraded = (REGLE_DEGRADATION and len(counted_courants) >= 2
+                and counted_courants[-1] < counted_courants[-2])
     if degraded:
         counted[-1] = 0
 
@@ -225,7 +205,7 @@ def somme_points_profils(profiles, nb_mois, profile_points, month_dates=None):
         total += counted[i]
     return total, detail
 
-# ── Sélection de la règle ──
+# ── Sélection de la règle (priorité : MSA spécifiques puis index) ──
 def trouver_regle(regles, site, msa, anciennete_mois, hire_date):
     def cle(r):
         return (0 if (r.get("msa") or []) else 1, r.get("index", 999))
