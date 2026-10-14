@@ -5,7 +5,7 @@
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
-const PP = { profils: {}, regles: [] };
+const PP = { profils: {}, profilsBase: {}, effets: [], regles: [] };
 const REF = {};                    // { "W0ZRVV": {msa, libelle} }
 let ALL_REF_ROWS = [];             // référentiel complet
 const REF_BY_MSA = {};             // { "WHFR1006": [rows...] }
@@ -160,7 +160,35 @@ function updateBaseHeures() {
   $("#base-heures-info").textContent = "Perf. " + perfMonthLabel() + " : " +
     ouvres + " j ouvrés × 8 h = " + base + " h (modifiable)";
 }
-function onRefMonthChange() { updateBaseHeures(); updateMonthLabels(); }
+function onRefMonthChange() {
+  applyProfileEffects();
+  refreshProfileSelects();
+  updateBaseHeures();
+  updateMonthLabels();
+}
+
+/* 📅 Points effectifs selon le mois de performance (historique) */
+function applyProfileEffects() {
+  const d = perfMonthDate();
+  const perfStart = iso(d.getFullYear(), d.getMonth() + 1, 1);
+  PP.profils = { ...PP.profilsBase };
+  (PP.effets || []).forEach((e) => {
+    if (perfStart < e.date_effet && e.profil in PP.profils) {
+      PP.profils[e.profil] = e.ancien;
+    }
+  });
+}
+
+/* Rafraîchit les dropdowns (points + couleurs) en préservant les sélections */
+function refreshProfileSelects() {
+  document.querySelectorAll(".act-card select.profile").forEach((sel) => {
+    const cur = sel.value;
+    sel.innerHTML = profileOptionsHTML();
+    if (cur) sel.value = cur;
+    paintSelect(sel);
+  });
+  fillPhProfils();
+}
 
 /* ═══════════════ Dropdown activités (filtré par MSA du collaborateur) ═══════════════ */
 function renderActList(msaCode) {
@@ -259,7 +287,10 @@ async function loadPayplan() {
   try {
     const j = await api("/api/payplan");
     if (!j.ok) return;
-    PP.profils = j.profils; PP.regles = j.regles;
+    PP.profilsBase = j.profils || {};
+    PP.effets = j.effets || [];
+    PP.regles = j.regles;
+    applyProfileEffects();
     fillPhProfils();
   } catch (e) { console.error(e); }
 }
