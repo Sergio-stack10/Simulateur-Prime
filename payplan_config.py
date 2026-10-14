@@ -1,13 +1,21 @@
 # -*- coding: utf-8 -*-
 """
 =====================================================================
- PAYPLAN — PRIME DE RÉGULARITÉ (v12)
+ PAYPLAN — PRIME DE RÉGULARITÉ (v16 · effet points MOIS PAR MOIS)
 =====================================================================
- ⚠️ Les règles ci-dessous ne servent qu'au PREMIER démarrage (BDD vide).
- Votre payplan réel vit dans MongoDB (matrice importée via Admin).
+ · PROFILE_POINT_EFFECTS : historique des points avec date d'effet
+   (au mois de PERFORMANCE). Un profil vaut « ancien » pour tout mois
+   antérieur à date_effet, et la valeur courante (payplan/Admin/BDD)
+   à partir de ce mois — résolu MOIS PAR MOIS (M1, M2, M3 séparément).
+ · PAYPLAN_RULES : seed uniquement (BDD vide / bouton reset).
+ ⚠️ Montants seed = placeholders 0 : vos vrais montants vivent en BDD
+    (matrice importée via Admin).
 =====================================================================
 """
 
+# -------------------------------------------------------------------------
+# 1) PROFILS (valeurs COURANTES — modifiables via Admin → Payplan)
+# -------------------------------------------------------------------------
 PROFILE_POINTS = {
     "Leader": 3,
     "Challenger": 2,
@@ -17,9 +25,8 @@ PROFILE_POINTS = {
 }
 
 # ── Historique des points (date d'effet au mois de PERFORMANCE) ──
-# Un profil listé ici garde la valeur « ancien » pour tout mois de
-# performance antérieur à « date_effet ». À partir de ce mois, c'est
-# la valeur courante du payplan (Admin / BDD) qui s'applique.
+# Ex : Challenger valait 3 pts pour tout mois de performance antérieur
+# à Septembre 2026 ; à partir de Sept. 2026 il vaut la valeur courante (2).
 PROFILE_POINT_EFFECTS = [
     {"profil": "Challenger", "ancien": 3, "date_effet": "2026-09-01"},
 ]
@@ -29,15 +36,15 @@ MIN_ANCIENNETE_MOIS = 4
 # Dernier mois compté en baisse → ses points ne sont pas comptés (L-L-F → 6)
 REGLE_DEGRADATION = True
 
-# Nouveaux intégrants (ancienneté 4 à 6 mois à la fin du mois de référence) :
-# le profil du PREMIER mois (M1) n'est pas pris en compte — seuls les
-# 2 derniers mois comptent, quelle que soit la règle du payplan.
+# Nouveaux intégrants (ancienneté 4 à 6 mois) : 1er mois non compté
 REGLE_NOUVEAUX_4_6 = True
 
 def _paliers(*triplets):
     return [{"min": a, "max": b, "montant": m} for a, b, m in triplets]
 
-# ⚠️ PLACEHOLDERS (0 Ar) — seed uniquement. Vos montants réels sont en BDD.
+# -------------------------------------------------------------------------
+# 2) RÈGLES SEED (⚠️ placeholders 0 — les vraies vivent en BDD via Admin)
+# -------------------------------------------------------------------------
 PAYPLAN_RULES = [
     {"index": 1, "nom": "ANTA · Avant 01/06/2023 · WHFR1135 & WHFR919",
      "sites": ["ANTA"], "msa": ["WHFR1135", "WHFR919"],
@@ -136,9 +143,20 @@ def _iso(d):
     except ValueError:
         return None
 
+# ── Résolution des points pour un mois donné ──
+def _legacy_value(profil, mois_iso):
+    """Valeur « ancienne » d'un profil pour un mois ISO donné, si un
+    historique (PROFILE_POINT_EFFECTS) s'applique (mois < date_effet).
+    Sinon None → utiliser la valeur courante du payplan."""
+    for e in PROFILE_POINT_EFFECTS:
+        if e.get("profil") == profil and str(mois_iso) < str(e.get("date_effet"))[:10]:
+            return e.get("ancien")
+    return None
+
 def resolve_profile_points(base_profils, perf_date):
-    """Points effectifs pour le mois de PERFORMANCE donné.
-    Avant date_effet → valeur historique ; sinon → valeur du payplan."""
+    """Points effectifs POUR UN MOIS DE PERFORMANCE donné (résolution globale).
+    Utilisé pour l'affichage / l'ancienne API. Le calcul par mois passe
+    plutôt par _legacy_value au sein de somme_points_profils."""
     pts = dict(base_profils or {})
     if perf_date is None:
         return pts
@@ -147,32 +165,52 @@ def resolve_profile_points(base_profils, perf_date):
             perf_date = date.fromisoformat(perf_date[:10])
         except ValueError:
             return pts
+    debut_mois = date(perf_date.year, perf_date.month, 1)
+    iso_debut = debut_mois.isoformat()
     for e in PROFILE_POINT_EFFECTS:
-        try:
-            eff = date.fromisoformat(str(e.get("date_effet"))[:10])
-        except (ValueError, TypeError):
-            continue
-        if perf_date < eff:
+        if iso_debut < str(e.get("date_effet"))[:10] and e.get("profil") in pts:
             pts[e["profil"]] = e.get("ancien")
     return pts
 
-def somme_points_profils(profiles, nb_mois, profile_points):
+# ── Points des profils d'une activité ──
+def somme_points_profils(profiles, nb_mois, profile_points, month_dates=None):
+    """
+    Points des N derniers mois (M3 = plus récent).
+    · « Non évalué » (None) = vide → 0 point.
+    · DÉGRADATION : dernier mois en baisse → ses points non comptés.
+    · month_dates = {M1: ISO, M2: ISO, M3: ISO} : chaque mois est résolu
+      SÉPARÉMENT — un profil peut valoir 3 pts en M1/M2 et 2 pts en M3
+      si la date d'effet tombe pendant le trimestre.
+    """
     labels = ["M1", "M2", "M3"]
     retenus = profiles if nb_mois >= len(profiles) else profiles[-nb_mois:]
     offset = len(profiles) - len(retenus)
     detail = []
 
-    def pts_of(p):
-        v = profile_points.get(p) if p in profile_points else 0
+    def base_pts(p):
+        v = profile_points.get(p) if p in profile_points else None
         return 0 if v is None else v
 
+    def pts_for_month(profil, label):
+        """Points de CE profil pour SON mois (historique inclus)."""
+        mois_iso = (month_dates or {}).get(label)
+        if mois_iso is None:
+            return base_pts(profil)
+        legacy = _legacy_value(profil, mois_iso)
+        if legacy is not None:
+            return 0 if legacy is None else legacy
+        return base_pts(profil)
+
+    # Mois hors période (ex : M1 quand la règle n'en compte que 2)
     for j in range(offset):
         p = profiles[j]
         detail.append({"mois": labels[j], "profil": p,
                        "points": profile_points.get(p) if p in profile_points else 0,
                        "pris_en_compte": False, "note": "hors période"})
 
-    counted = [pts_of(p) for p in retenus]
+    # Valeurs résolues MOIS PAR MOIS
+    counted = [pts_for_month(p, labels[offset + i]) for i, p in enumerate(retenus)]
+
     degraded = (REGLE_DEGRADATION and len(counted) >= 2 and counted[-1] < counted[-2])
     if degraded:
         counted[-1] = 0
@@ -182,10 +220,12 @@ def somme_points_profils(profiles, nb_mois, profile_points):
         note = "0 pt — dégradation" if (degraded and i == len(counted) - 1) else None
         detail.append({"mois": labels[offset + i], "profil": p,
                        "points": profile_points.get(p) if p in profile_points else 0,
-                       "pris_en_compte": True, "note": note})
+                       "pris_en_compte": True, "note": note,
+                       "points_mois": counted[i]})
         total += counted[i]
     return total, detail
 
+# ── Sélection de la règle ──
 def trouver_regle(regles, site, msa, anciennete_mois, hire_date):
     def cle(r):
         return (0 if (r.get("msa") or []) else 1, r.get("index", 999))
@@ -217,7 +257,9 @@ def _montant_for_points(paliers, points):
             continue
     return None
 
-def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_points, rules):
+# ── Calcul d'une activité ──
+def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_points, rules,
+                       month_dates=None):
     res = {"msa": msa, "regle": None, "total_points": 0, "montant": None,
            "eligible": False, "explication": "", "detail_points": [], "nb_mois_profil": None}
     regle = trouver_regle(rules, site, msa, anciennete, hire_date)
@@ -228,11 +270,10 @@ def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_point
         return res
 
     nb_mois = regle["nb_mois_profil"]
-    # Nouveaux intégrants (4 à 6 mois) : le 1er mois n'est pas compté
     if REGLE_NOUVEAUX_4_6 and 4 <= anciennete <= 6:
         nb_mois = min(nb_mois, 2)
 
-    total, detail = somme_points_profils(profiles, nb_mois, profile_points)
+    total, detail = somme_points_profils(profiles, nb_mois, profile_points, month_dates)
     montant = _montant_for_points(regle["montants"], total)
     res.update({"regle": regle["nom"], "nb_mois_profil": nb_mois,
                 "detail_points": detail, "total_points": total,
@@ -250,9 +291,11 @@ def calculate_activity(hire_date, site, msa, profiles, anciennete, profile_point
     res["montant"] = montant
     return res
 
+# ── Calcul global (prorata base d'heures) ──
 def calculate_prime(hire_date, site, activites, reference_date=None,
-                    profile_points=None, rules=None, base_heures=None):
-    """Prorata : (montant_base × heures_activité) ÷ base_heures"""
+                    profile_points=None, rules=None, base_heures=None, month_dates=None):
+    """activites : [{activity_id, msa, heures, profiles}, ...]
+    Prorata : montant_proratise = (montant_base × heures_activité) ÷ base_heures"""
     profile_points = profile_points if profile_points is not None else PROFILE_POINTS
     rules = rules if rules is not None else PAYPLAN_RULES
     reference_date = reference_date or date.today()
@@ -278,7 +321,8 @@ def calculate_prime(hire_date, site, activites, reference_date=None,
     for a in activites:
         h = float(a.get("heures") or 0)
         act = calculate_activity(hire_date, site, a.get("msa"), a.get("profiles") or [],
-                                 anciennete, profile_points, rules)
+                                 anciennete, profile_points, rules,
+                                 month_dates=month_dates)
         act["activity_id"] = a.get("activity_id")
         act["heures"] = h
         act["part"] = round(h / base_heures * 100, 1)
