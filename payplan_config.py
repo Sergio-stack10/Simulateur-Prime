@@ -16,6 +16,14 @@ PROFILE_POINTS = {
     "Non évalué": None,     # None = vide : aucun point
 }
 
+# ── Historique des points (date d'effet au mois de PERFORMANCE) ──
+# Un profil listé ici garde la valeur « ancien » pour tout mois de
+# performance antérieur à « date_effet ». À partir de ce mois, c'est
+# la valeur courante du payplan (Admin / BDD) qui s'applique.
+PROFILE_POINT_EFFECTS = [
+    {"profil": "Challenger", "ancien": 3, "date_effet": "2026-09-01"},
+]
+
 MIN_ANCIENNETE_MOIS = 4
 
 # Dernier mois compté en baisse → ses points ne sont pas comptés (L-L-F → 6)
@@ -127,6 +135,26 @@ def _iso(d):
         return date.fromisoformat(str(d)[:10])
     except ValueError:
         return None
+
+def resolve_profile_points(base_profils, perf_date):
+    """Points effectifs pour le mois de PERFORMANCE donné.
+    Avant date_effet → valeur historique ; sinon → valeur du payplan."""
+    pts = dict(base_profils or {})
+    if perf_date is None:
+        return pts
+    if isinstance(perf_date, str):
+        try:
+            perf_date = date.fromisoformat(perf_date[:10])
+        except ValueError:
+            return pts
+    for e in PROFILE_POINT_EFFECTS:
+        try:
+            eff = date.fromisoformat(str(e.get("date_effet"))[:10])
+        except (ValueError, TypeError):
+            continue
+        if perf_date < eff:
+            pts[e["profil"]] = e.get("ancien")
+    return pts
 
 def somme_points_profils(profiles, nb_mois, profile_points):
     labels = ["M1", "M2", "M3"]
