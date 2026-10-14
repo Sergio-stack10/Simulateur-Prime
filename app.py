@@ -18,7 +18,7 @@ from flask import (Flask, jsonify, redirect, render_template, request,
 
 from db import (get_db, get_payplan, save_payplan, reset_payplan,
                 get_ref_msa, save_ref_msa, reset_ref_msa)
-from payplan_config import calculate_prime
+from payplan_config import calculate_prime, resolve_profile_points, PROFILE_POINT_EFFECTS
 
 load_dotenv()
 
@@ -191,7 +191,8 @@ def health():
 @login_required
 def api_payplan_get():
     profils, regles = get_payplan()
-    return jsonify({"ok": True, "profils": profils, "regles": regles})
+    return jsonify({"ok": True, "profils": profils, "regles": regles,
+                    "effets": PROFILE_POINT_EFFECTS})
 
 @app.put("/api/payplan")
 @admin_required
@@ -624,6 +625,8 @@ def api_calculate():
         reference_date = date.fromisoformat(ref_raw) if ref_raw else date.today()
     except ValueError:
         return jsonify({"ok": False, "error": "Date de référence invalide."}), 400
+    # Points effectifs selon le mois de performance (historique Challenger etc.)
+    profils = resolve_profile_points(profils, reference_date)
 
     ref_msa = {r["id"]: r["msa"] for r in get_ref_msa()}
     clean = []
