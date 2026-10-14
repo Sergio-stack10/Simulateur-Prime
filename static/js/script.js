@@ -1,39 +1,59 @@
 /* ============================================================
-   SimuPrime v13 — script.js COMPLET
-   Mois de PAIE (M+1) · perf = paie - 1 · heures 0 autorisées ·
-   dropdown activités filtré par MSA · couleurs profils
+   SimuPrime v17 — script.js COMPLET
+   · Mois de paie (M+1) → perf = paie − 1
+   · Points de profils résolus MOIS PAR MOIS (historique date d'effet)
+   · Dropdowns : chaque bloc M1/M2/M3 affiche SES points + sa couleur
+   · Dégradation sur points COURANTS (changement de barème ≠ dégradation)
+   · Heures ≥ 0 · dropdown activités filtré par MSA · couleurs profils
+   · Suppression de simulations par ligne
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const fmt = new Intl.NumberFormat("fr-FR");
-const PP = { profils: {}, profilsBase: {}, effets: [], regles: [] };
+const PP = { profilsBase: {}, effets: [], regles: [] };
 const REF = {};                    // { "W0ZRVV": {msa, libelle} }
-let ALL_REF_ROWS = [];             // référentiel complet
-const REF_BY_MSA = {};             // { "WHFR1006": [rows...] }
+let ALL_REF_ROWS = [];
 let employee = null;
 const MAX_ACT = 7;
 let placeholderResult = "", placeholderRules = "";
 
-/* ═══════════ 🎨 CODE COULEUR DES PROFILS ═══════════ */
+/* ═══════════ 🎨 CODE COULEUR DES PROFILS (par POINTS) ═══════════ */
 const COLOR_STYLES = {
   green:  { bg: "#dcfce7", border: "#15803d", fg: "#166534" },   // 3 pts et +
-  yellow: { bg: "#fef9c3", border: "#eab308", fg: "#713f12" },   // 2 pts — jaune vif
-  orange: { bg: "#ffedd5", border: "#ea580c", fg: "#7c2d12" },   // 1 pt — orange soutenu
+  yellow: { bg: "#fef9c3", border: "#eab308", fg: "#713f12" },   // 2 pts
+  orange: { bg: "#ffedd5", border: "#ea580c", fg: "#7c2d12" },   // 1 pt
   red:    { bg: "#fef2f2", border: "#dc2626", fg: "#7f1d1d" },   // 0 pt
   gray:   { bg: "#f1f5f9", border: "#94a3b8", fg: "#64748b" },   // vide
 };
-function colorForProfile(name) {
+
+/* Couleur selon les POINTS — suit automatiquement les valeurs du payplan */
+function colorForPoints(pts) {
+  if (pts === null || pts === undefined) return "gray";
+  if (pts >= 3) return "green";
+  if (pts === 2) return "yellow";
+  if (pts === 1) return "orange";
+  if (pts === 0) return "red";
+  return null;
+}
+
+/* Points d'un profil pour un mois précis (historique inclus)
+   monthKey = "M1"|"M2"|"M3" (absent = valeur courante) */
+function ptsForProfileMonth(name, monthKey) {
   if (!name) return null;
-  /* 1) Par POINTS du payplan — la couleur suit automatiquement
-        si vous modifiez les points (panneau Admin) */
-  const pts = PP.profils[name];
-  if (pts !== undefined) {
-    if (pts === null || pts === undefined) return "gray";   // Non évalué
-    if (pts >= 3) return "green";    // ex : Leader 3
-    if (pts === 2) return "yellow";  // ex : Challenger 2
-    if (pts === 1) return "orange";  // ex : Fragile 1
-    if (pts === 0) return "red";     // ex : Care 0
+  let v = PP.profilsBase[name];
+  if (monthKey) {
+    const moisISO = moisISOForKey(monthKey);
+    const legacy = (PP.effets || []).find(
+      (e) => e.profil === name && moisISO < String(e.date_effet).slice(0, 10));
+    if (legacy) v = legacy.ancien;
   }
-  /* 2) Fallback par nom (uniquement si le profil est absent du payplan) */
+  return v;
+}
+
+function colorForProfile(name, monthKey) {
+  if (!name) return null;
+  const pts = ptsForProfileMonth(name, monthKey);
+  if (pts !== undefined && pts !== null) return colorForPoints(pts);
+  if (pts === null && PP.profilsBase[name] === null) return "gray";
   const n = String(name).trim().toLowerCase().normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   if (/(leader|^l$)/.test(n)) return "green";
@@ -43,9 +63,12 @@ function colorForProfile(name) {
   if (/(non|evalue|vide)/.test(n)) return "gray";
   return null;
 }
+
+/* Peint UN select selon SON mois (M1/M2/M3 via data-month) */
 function paintSelect(sel) {
-  const c = colorForProfile(sel.value);
-  sel.classList.remove("pc-green", "pc-orange", "pc-red", "pc-gray");
+  const monthKey = sel.dataset.month || null;
+  const c = colorForProfile(sel.value, monthKey);
+  sel.classList.remove("pc-green", "pc-yellow", "pc-orange", "pc-red", "pc-gray");
   const monthEl = sel.closest(".profile-cell")?.querySelector(".p-month");
   if (!c) {
     sel.style.background = ""; sel.style.borderColor = "";
@@ -61,19 +84,23 @@ function paintSelect(sel) {
   sel.classList.add("pc-" + c);
   if (monthEl) monthEl.style.color = s.border;
 }
+
 function colorProfiles(cardEl) {
   (cardEl ? [cardEl] : document.querySelectorAll(".act-card")).forEach((card) => {
     card.querySelectorAll("select.profile").forEach(paintSelect);
   });
 }
-function profilBadgeHTML(name) {
-  const c = colorForProfile(name);
+
+/* Pastille colorée — couleur selon le mois si fourni (ex: détail des règles) */
+function profilBadgeHTML(name, monthKey) {
+  const c = colorForProfile(name, monthKey);
   return c ? `<span class="pchip pc-${c}">${esc(name)}</span>` : `<b>${esc(name)}</b>`;
 }
-/* Ordre d'affichage des profils */
+
+/* Ordre d'affichage voulu ; profils inconnus en fin de liste */
 const PROFILE_ORDER = ["Non évalué", "Care", "Fragile", "Challenger", "Leader"];
 function orderedProfiles() {
-  const keys = Object.keys(PP.profils);
+  const keys = Object.keys(PP.profilsBase);
   const known = PROFILE_ORDER.filter((k) => keys.includes(k));
   const rest = keys.filter((k) => !PROFILE_ORDER.includes(k));
   return [...known, ...rest];
@@ -116,13 +143,13 @@ function iso(y, m, d) {
   return y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
 }
 
-/* ═══════════════ Mois de PAIE → mois de PERFORMANCE = paie − 1 ═══════════════ */
+/* ═══════════════ Mois de PAIE → PERFORMANCE = paie − 1 ═══════════════ */
 function paieMonthDate() {
   return new Date(parseInt($("#ref-year").value), parseInt($("#ref-month").value) - 1, 1);
 }
 function perfMonthDate() {
   const p = paieMonthDate();
-  return new Date(p.getFullYear(), p.getMonth() - 1, 1);   // M-1 (gère janvier→décembre)
+  return new Date(p.getFullYear(), p.getMonth() - 1, 1);
 }
 function perfMonthLabel() {
   const d = perfMonthDate();
@@ -141,6 +168,15 @@ function monthMap() {
   });
   return map;
 }
+
+/* ISO du 1er jour du mois correspondant à la clé M1/M2/M3 */
+function moisISOForKey(key) {
+  const d = perfMonthDate();
+  const shift = key === "M1" ? -2 : key === "M2" ? -1 : 0;
+  const m = new Date(d.getFullYear(), d.getMonth() + shift, 1);
+  return iso(m.getFullYear(), m.getMonth() + 1, 1);
+}
+
 function updateMonthLabels() {
   const mm = monthMap();
   document.querySelectorAll(".act-card .p-month").forEach((el) => {
@@ -161,33 +197,9 @@ function updateBaseHeures() {
     ouvres + " j ouvrés × 8 h = " + base + " h (modifiable)";
 }
 function onRefMonthChange() {
-  applyProfileEffects();
-  refreshProfileSelects();
   updateBaseHeures();
   updateMonthLabels();
-}
-
-/* 📅 Points effectifs selon le mois de performance (historique) */
-function applyProfileEffects() {
-  const d = perfMonthDate();
-  const perfStart = iso(d.getFullYear(), d.getMonth() + 1, 1);
-  PP.profils = { ...PP.profilsBase };
-  (PP.effets || []).forEach((e) => {
-    if (perfStart < e.date_effet && e.profil in PP.profils) {
-      PP.profils[e.profil] = e.ancien;
-    }
-  });
-}
-
-/* Rafraîchit les dropdowns (points + couleurs) en préservant les sélections */
-function refreshProfileSelects() {
-  document.querySelectorAll(".act-card select.profile").forEach((sel) => {
-    const cur = sel.value;
-    sel.innerHTML = profileOptionsHTML();
-    if (cur) sel.value = cur;
-    paintSelect(sel);
-  });
-  fillPhProfils();
+  refreshProfileSelects();   // régénère les dropdowns avec les points du trimestre
 }
 
 /* ═══════════════ Dropdown activités (filtré par MSA du collaborateur) ═══════════════ */
@@ -196,7 +208,7 @@ function renderActList(msaCode) {
   if (!dl) return;
   let rows = ALL_REF_ROWS;
   if (msaCode && rows.some((r) => r.msa === msaCode)) {
-    rows = rows.filter((r) => r.msa === msaCode);   // activités du MSA du collaborateur
+    rows = rows.filter((r) => r.msa === msaCode);
   }
   dl.innerHTML = rows.map((r) =>
     `<option value="${esc(r.id)}" label="${esc(r.libelle || r.msa)}"></option>`).join("");
@@ -207,7 +219,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   placeholderResult = $("#result-card").innerHTML;
   placeholderRules = $("#rules-card").innerHTML;
 
-  /* 🎨 Délégation globale : tout changement de select profil repeint la couleur */
+  /* 🎨 Délégation globale : tout changement de select profil repeint selon SON mois */
   document.addEventListener("change", (e) => {
     if (e.target && e.target.matches && e.target.matches("select.profile")) {
       paintSelect(e.target);
@@ -225,7 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const o = document.createElement("option");
     o.value = y; o.textContent = y; ys.appendChild(o);
   }
-  ms.value = now.getMonth() + 1;      // défaut : mois de paie courant
+  ms.value = now.getMonth() + 1;
   ys.value = now.getFullYear();
   ms.onchange = onRefMonthChange;
   ys.onchange = onRefMonthChange;
@@ -260,7 +272,7 @@ function resetAll() {
   $("#ref-month").value = now.getMonth() + 1;
   $("#ref-year").value = now.getFullYear();
   onRefMonthChange();
-  renderActList(null);                 // dropdown complet à nouveau
+  renderActList(null);
   $("#activites").innerHTML = "";
   addActivity();
   $("#result-card").innerHTML = placeholderResult;
@@ -269,55 +281,69 @@ function resetAll() {
   window.scrollTo({ top: 0, behavior: "smooth" });
   toast("Formulaire réinitialisé — nouvelle simulation prête ✨", "success");
 }
+
 function fillPhProfils() {
   const ph = $("#ph-profils");
   if (!ph) return;
   ph.innerHTML = orderedProfiles().map((c) => {
-    const p = PP.profils[c];
-    const col = colorForProfile(c);
+    const p = PP.profilsBase[c];
+    const col = colorForPoints(p);
     const cls = col ? "pc-" + col : "pc-gray";
     return `<span class="pchip ${cls}">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`;
   }).join("");
 }
+
 async function logout() {
   try { await api("/api/auth/logout", { method: "POST" }); } catch (e) {}
   location.href = "/login";
 }
+
 async function loadPayplan() {
   try {
     const j = await api("/api/payplan");
     if (!j.ok) return;
     PP.profilsBase = j.profils || {};
     PP.effets = j.effets || [];
-    PP.regles = j.regles;
-    applyProfileEffects();
+    PP.regles = j.regles || [];
+    refreshProfileSelects();
     fillPhProfils();
   } catch (e) { console.error(e); }
 }
+
 async function loadRef() {
   try {
     const j = await api("/api/ref-msa");
     if (!j.ok) return;
     ALL_REF_ROWS = j.data || [];
-    Object.keys(REF_BY_MSA).forEach((k) => delete REF_BY_MSA[k]);
     ALL_REF_ROWS.forEach((r) => {
       REF[r.id] = { msa: r.msa, libelle: r.libelle || "" };
-      (REF_BY_MSA[r.msa] = REF_BY_MSA[r.msa] || []).push(r);
     });
     renderActList(employee ? employee.msa_code : null);
   } catch (e) { console.error(e); }
 }
-function profileOptionsHTML() {
+
+/* Options colorées + points propres à CE mois (historique inclus) */
+function profileOptionsHTML(monthKey) {
   return `<option value="" disabled selected>Sélectionner…</option>` +
     orderedProfiles().map((code) => {
-      const pts = PP.profils[code];
-      const val = (pts === null || pts === undefined) ? "vide" : pts + " pt";
-      const c = colorForProfile(code);
+      const v = ptsForProfileMonth(code, monthKey);
+      const val = (v === null || v === undefined) ? "vide" : v + " pt";
+      const c = colorForPoints(v);
       const style = c
         ? ` style="background:${COLOR_STYLES[c].bg};color:${COLOR_STYLES[c].fg};font-weight:700"`
         : "";
       return `<option value="${esc(code)}"${style}>${esc(code)} · ${val}</option>`;
     }).join("");
+}
+
+/* Régénère tous les dropdowns avec les points du trimestre (sélections gardées) */
+function refreshProfileSelects() {
+  document.querySelectorAll(".act-card select.profile").forEach((sel) => {
+    const cur = sel.value;
+    sel.innerHTML = profileOptionsHTML(sel.dataset.month || null);
+    if (cur) sel.value = cur;
+    paintSelect(sel);
+  });
 }
 
 /* ═══════════════ Activités ═══════════════ */
@@ -346,11 +372,11 @@ function addActivity(activityId = "") {
       <div class="field"><label>Profils des 3 derniers mois *</label>
         <div class="profile-row">
           <div class="profile-cell"><span class="p-month" data-m="M1">M1</span>
-            <select class="profile a-p1">${profileOptionsHTML()}</select></div>
+            <select class="profile a-p1" data-month="M1">${profileOptionsHTML("M1")}</select></div>
           <div class="profile-cell"><span class="p-month" data-m="M2">M2</span>
-            <select class="profile a-p2">${profileOptionsHTML()}</select></div>
+            <select class="profile a-p2" data-month="M2">${profileOptionsHTML("M2")}</select></div>
           <div class="profile-cell"><span class="p-month" data-m="M3">M3</span>
-            <select class="profile a-p3">${profileOptionsHTML()}</select></div>
+            <select class="profile a-p3" data-month="M3">${profileOptionsHTML("M3")}</select></div>
         </div></div>
     </div>`;
 
@@ -419,10 +445,7 @@ async function searchEmployee() {
     $("#site").value = SITE_LABELS[j.data.site] || j.data.site || "—";
     $("#site").dataset.code = j.data.site || "ANTA";
     $("#hire-date").value = j.data.hire_date || "";
-
-    /* Dropdown des activités filtré sur le MSA du collaborateur */
     renderActList(j.data.msa_code);
-
     const first = $("#activites").querySelector(".act-card");
     if (first && !first.querySelector(".a-act").value && j.data.projet_code) {
       first.querySelector(".a-act").value = j.data.projet_code;
@@ -462,7 +485,7 @@ async function calculate() {
 
   const acts = [...$("#activites").children].map((c) => ({
     activity_id: c.querySelector(".a-act").value.trim().toUpperCase(),
-    heures: parseFloat(c.querySelector(".a-heures").value) || 0,   // vide ou 0 → 0
+    heures: parseFloat(c.querySelector(".a-heures").value) || 0,
     profiles: [".a-p1", ".a-p2", ".a-p3"].map((s) => c.querySelector(s).value),
   }));
   for (let i = 0; i < acts.length; i++) {
@@ -482,7 +505,7 @@ async function calculate() {
       body: JSON.stringify({
         matricule: employee ? employee.matricule : $("#matricule").value.trim(),
         hire_date: hireDate, site,
-        reference_date: perfMonthEndISO(),     // fin du mois de PERFORMANCE
+        reference_date: perfMonthEndISO(),
         base_heures: baseHeures,
         activites: acts }) });
     if (!j.ok) { toast(j.error, "error"); return; }
@@ -553,6 +576,8 @@ function renderResult(d) {
                `${i.anciennete_max != null ? " à " + i.anciennete_max + " mois" : " mois et +"}`);
     return parts.join(" · ");
   };
+
+  /* Mois comptés : points EFFECTIFS du mois (historique inclus) — badge coloré du mois */
   const details = acts.map((a, idx) => `
     <details class="rule-detail" ${idx === 0 ? "open" : ""}>
       <summary>${esc(a.activity_id || "")} — ${esc(a.msa)} ·
@@ -562,7 +587,14 @@ function renderResult(d) {
         <p class="small"><b>Conditions :</b> ${esc(conditions(a))}</p>
         <p class="small"><b>Mois comptés (${a.nb_mois_profil}) :</b>
           ${(a.detail_points || []).filter((p) => p.pris_en_compte)
-            .map((p) => `${mm[p.mois] || p.mois} : ${profilBadgeHTML(p.profil)} (${p.note ? esc(p.note) : (p.points === null || p.points === undefined ? "vide" : p.points + " pt")})`)
+            .map((p) => {
+              const pts = (p.points_mois !== undefined && p.points_mois !== null)
+                ? p.points_mois : p.points;
+              const ancien = (p.points != null && pts != null && p.points !== pts)
+                ? ` (ancienne valeur : ${p.points} pt)` : "";
+              const ptsTxt = (pts === null || pts === undefined) ? "vide" : pts + " pt" + ancien;
+              return `${mm[p.mois] || p.mois} : ${profilBadgeHTML(p.profil, p.mois)} (${p.note ? esc(p.note) : ptsTxt})`;
+            })
             .join(" · ")}</p>
         ${a.nb_mois_profil < 3 && (d.anciennete_mois >= 4 && d.anciennete_mois <= 6)
           ? `<p class="small"><b>Nouvel intégrant (4-6 mois) :</b> 1er mois non compté.</p>` : ""}
@@ -594,9 +626,10 @@ async function loadMySims() {
           onclick="deleteSim('${r.id}')">🗑</button>` : ""}</td></tr>`;
     }).join("");
     $("#my-sims-body").innerHTML = rows ||
-      `<tr><td colspan="5" class="muted center">Aucune simulation pour le moment.</td></tr>`;
+      `<tr><td colspan="6" class="muted center">Aucune simulation pour le moment.</td></tr>`;
   } catch (e) {}
 }
+
 async function clearMySims() {
   if (!confirm("Supprimer toutes VOS simulations de cette session ?")) return;
   try {
@@ -604,6 +637,7 @@ async function clearMySims() {
     if (j.ok) { toast(j.message, "success"); await loadMySims(); }
   } catch (e) {}
 }
+
 async function deleteSim(id) {
   if (!confirm("Supprimer cette simulation ?")) return;
   try {
