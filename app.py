@@ -626,7 +626,6 @@ def api_calculate():
     except ValueError:
         return jsonify({"ok": False, "error": "Date de référence invalide."}), 400
     # Points effectifs selon le mois de performance (historique Challenger etc.)
-    profils = resolve_profile_points(profils, reference_date)
 
     ref_msa = {r["id"]: r["msa"] for r in get_ref_msa()}
     clean = []
@@ -664,6 +663,19 @@ def api_calculate():
         get_db().simulations.insert_one(record)
     except Exception:
         pass
+    # Dates des 3 mois de profils (résolution mois par mois)
+    def month_first(dt):
+        return f"{dt.year:04d}-{dt.month:02d}-01"
+    ref = reference_date.replace(day=1)
+    m2 = ref.replace(month=ref.month - 1) if ref.month >= 2 else ref.replace(year=ref.year - 1, month=12)
+    m1 = ref.replace(month=ref.month - 2) if ref.month >= 3 else (
+        ref.replace(year=ref.year - 1, month=ref.month + 10) if ref.month == 2
+        else ref.replace(year=ref.year - 1, month=12))
+    month_dates = {"M1": month_first(m1), "M2": month_first(m2), "M3": month_first(ref)}
+
+    result = calculate_prime(hire_date, site, clean, reference_date,
+                             profils, regles, base_heures=base_heures,
+                             month_dates=month_dates)
     return jsonify({"ok": True, "data": result})
 
 # ------------------------------------------------------------- Simulations
