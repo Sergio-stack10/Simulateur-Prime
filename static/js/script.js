@@ -591,7 +591,7 @@ function renderResult(d) {
               const pts = (p.points_mois !== undefined && p.points_mois !== null)
                 ? p.points_mois : p.points;
               const ancien = (p.points != null && pts != null && p.points !== pts)
-                ? ` (ancienne valeur : ${p.points} pt)` : "";
+                ? ` (nouvelle valeur : ${p.points} pt)` : "";
               const ptsTxt = (pts === null || pts === undefined) ? "vide" : pts + " pt" + ancien;
               return `${mm[p.mois] || p.mois} : ${profilBadgeHTML(p.profil, p.mois)} (${p.note ? esc(p.note) : ptsTxt})`;
             })
