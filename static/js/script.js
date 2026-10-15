@@ -289,7 +289,8 @@ function fillPhProfils() {
     const p = PP.profilsBase[c];
     const col = colorForPoints(p);
     const cls = col ? "pc-" + col : "pc-gray";
-    return `<span class="pchip ${cls}">${esc(c)} · ${p === null ? "vide" : p + " pt"}</span>`;
+    const lbl = p === null ? "vide" : p + " pt" + (Math.abs(p) >= 2 ? "s" : "");
+    return `<span class="pchip ${cls}">${esc(c)} · ${lbl}</span>`;
   }).join("");
 }
 
@@ -327,7 +328,8 @@ function profileOptionsHTML(monthKey) {
   return `<option value="" disabled selected>Sélectionner…</option>` +
     orderedProfiles().map((code) => {
       const v = ptsForProfileMonth(code, monthKey);
-      const val = (v === null || v === undefined) ? "vide" : v + " pt";
+      const val = (v === null || v === undefined) ? "vide"
+        : v + " pt" + (Math.abs(v) >= 2 ? "s" : "");
       const c = colorForPoints(v);
       const style = c
         ? ` style="background:${COLOR_STYLES[c].bg};color:${COLOR_STYLES[c].fg};font-weight:700"`
@@ -532,7 +534,7 @@ function renderResult(d) {
           ${libelleOf(a.activity_id) ? `<br/><span class="muted small">${esc(libelleOf(a.activity_id))}</span>` : ""}</td>
       <td class="center">${fmt.format(a.heures)} h</td>
       <td class="center">${a.part ?? 0}%</td>
-      <td class="center"><b>${a.total_points}</b> pts${isDegraded(a) ? '<span class="deg-badge">⚠</span>' : ""}</td>
+      <td class="center"><b>${a.total_points}</b> pt${Math.abs(a.total_points) >= 2 ? "s" : ""}${isDegraded(a) ? '<span class="deg-badge">⚠</span>' : ""}</td>
       <td>${a.eligible ? fmt.format(a.montant) + " Ar" : "—"}</td>
       <td><b>${fmt.format(a.montant_proratise || 0)} Ar</b></td>
     </tr>`).join("");
@@ -563,7 +565,9 @@ function renderResult(d) {
   const baremeChips = (a) => (a.bareme || []).slice().sort((x, y) => x.min - y.min)
     .map((p) => {
       const hit = a.total_points >= p.min && a.total_points <= p.max;
-      const plage = p.min === p.max ? p.min + " pt" : p.min + "–" + p.max + " pts";
+      const plage = p.min === p.max
+        ? p.min + " pt" + (p.min >= 2 ? "s" : "")
+        : p.min + "–" + p.max + " pts";
       return `<span class="bchip ${hit ? "hit" : ""}">${plage} → ${fmt.format(p.montant)} Ar</span>`;
     }).join("");
   const conditions = (a) => {
