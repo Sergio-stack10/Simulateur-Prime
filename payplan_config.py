@@ -149,6 +149,26 @@ def _legacy_value(profil, mois_iso):
             return e.get("ancien")
     return None
 
+# ── Résolution globale (compatibilité app.py) ──
+def resolve_profile_points(base_profils, perf_date):
+    """Points effectifs POUR UN MOIS donné (résolution globale).
+    Le calcul réel passe par _legacy_value (mois par mois) — ceci garde
+    la compatibilité avec les imports d'app.py."""
+    pts = dict(base_profils or {})
+    if perf_date is None:
+        return pts
+    if isinstance(perf_date, str):
+        try:
+            perf_date = date.fromisoformat(perf_date[:10])
+        except ValueError:
+            return pts
+    debut_mois = date(perf_date.year, perf_date.month, 1).isoformat()
+    for e in PROFILE_POINT_EFFECTS:
+        if debut_mois < str(e.get("date_effet"))[:10] and e.get("profil") in pts:
+            pts[e["profil"]] = e.get("ancien")
+    return pts
+
+
 # ── Points des profils d'une activité (résolution MOIS PAR MOIS) ──
 def somme_points_profils(profiles, nb_mois, profile_points, month_dates=None):
     """
